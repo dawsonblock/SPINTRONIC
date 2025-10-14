@@ -169,8 +169,7 @@ EnhancedFitResult AdvancedFitter::fit() {
 
         // Timing
         auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        result.computation_time_s = duration.count() / 1000.0;
+        result.computation_time_s = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time).count();
 
         if (verbose_) {
             std::cout << "\n=== Fitting Completed ===" << std::endl;
