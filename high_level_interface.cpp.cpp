@@ -44,7 +44,7 @@ PseudomodeFramework2D::SimulationResult PseudomodeFramework2D::simulate_material
 
         // Compute correlation function via FFT
         std::vector<Complex> C_data(time_grid.size());
-        Utils::fft_correlation_to_spectrum(J_omega, C_data);
+        Utils::fft_correlation_to_spectrum(C_data, J_omega);
 
         std::cout << "Step 2: Fitting pseudomode decomposition" << std::endl;
 
