@@ -1,0 +1,160 @@
+# SPINTRONIC Quantum Dynamics Simulation Framework - Docker Container
+# Apache License 2.0 - Copyright (c) 2025 Aetheron Research
+# Phase 5-7 Complete: Materials Database + CUDA Support + Python Bindings
+
+# =============================================================================
+# Stage 1: Build Environment
+# =============================================================================
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    # Build tools
+    build-essential cmake git wget curl \
+    # C++ compiler
+    g++ gcc \
+    # Required libraries
+    libomp-dev \
+    # Optional: CUDA toolkit (comment out if not needed)
+    # nvidia-cuda-toolkit \
+    # Python for bindings
+    python3 python3-dev python3-pip \
+    # Testing
+    libgtest-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for bindings
+RUN pip3 install --no-cache-dir pybind11 numpy scipy matplotlib jupyter
+
+# Install Eigen3 (header-only)
+WORKDIR /tmp
+RUN wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz && \
+    tar xzf eigen-3.4.0.tar.gz && \
+    cd eigen-3.4.0 && \
+    mkdir build && cd build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    make install && \
+    cd /tmp && rm -rf eigen-3.4.0*
+
+# Set up build environment
+WORKDIR /build
+
+# Copy source code
+COPY CMakeLists.txt /build/
+COPY include/ /build/include/
+COPY src/ /build/src/
+COPY tests/ /build/tests/
+COPY examples/ /build/examples/
+COPY cmake/ /build/cmake/
+
+# Configure and build
+RUN mkdir -p /build/build && cd /build/build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DUSE_OPENMP=ON \
+        -DUSE_CUDA=OFF \
+        -DBUILD_PYTHON_BINDINGS=ON \
+        -DBUILD_TESTS=ON \
+        -DCMAKE_INSTALL_PREFIX=/opt/pseudomode && \
+    make -j$(nproc) && \
+    make install
+
+# Run validation tests
+RUN cd /build/build && \
+    ./test_materials_database && \
+    ./test_cuda_validation
+
+# =============================================================================
+# Stage 2: Runtime Environment (Minimal)
+# =============================================================================
+FROM ubuntu:22.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    # Runtime libraries
+    libgomp1 \
+    libstdc++6 \
+    # Python runtime
+    python3 python3-numpy python3-scipy python3-matplotlib \
+    # Utilities
+    curl vim less \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy installed framework from builder
+COPY --from=builder /opt/pseudomode /opt/pseudomode
+
+# Set environment variables
+ENV PATH="/opt/pseudomode/bin:$PATH"
+ENV LD_LIBRARY_PATH="/opt/pseudomode/lib:$LD_LIBRARY_PATH"
+ENV PYTHONPATH="/opt/pseudomode/python:$PYTHONPATH"
+
+# Create working directory
+RUN mkdir -p /workspace && chmod 777 /workspace
+WORKDIR /workspace
+
+# Copy examples and documentation
+COPY --from=builder /build/examples/ /workspace/examples/
+COPY --from=builder /build/README.md /workspace/
+COPY --from=builder /build/docs/ /workspace/docs/
+
+# Create non-root user for security
+RUN useradd -m -s /bin/bash quantum && \
+    chown -R quantum:quantum /workspace
+USER quantum
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD pseudomode_cli --help > /dev/null 2>&1 || exit 1
+
+# Default command
+CMD ["bash", "-c", "\
+    echo '╔════════════════════════════════════════════════════════════════╗'; \
+    echo '║  SPINTRONIC Quantum Dynamics Simulation Framework              ║'; \
+    echo '║  Phase 5-7 Complete: Materials + CUDA + Python Bindings       ║'; \
+    echo '║  Apache License 2.0 - Copyright (c) 2025 Aetheron Research    ║'; \
+    echo '╚════════════════════════════════════════════════════════════════╝'; \
+    echo ''; \
+    echo 'Features:'; \
+    echo '  ✓ 13 2D materials database (MoS2, graphene, hBN, GaN, etc.)'; \
+    echo '  ✓ Temperature-dependent phonon coupling'; \
+    echo '  ✓ Custom material JSON import'; \
+    echo '  ✓ CUDA GPU acceleration support'; \
+    echo '  ✓ Python bindings (pybind11)'; \
+    echo ''; \
+    echo 'Available commands:'; \
+    echo '  pseudomode_cli    - Command-line interface'; \
+    echo '  python3           - Python with pseudomode module'; \
+    echo ''; \
+    echo 'Available materials:'; \
+    python3 -c 'import pseudomode_py; print(pseudomode_py.list_materials())' || \
+    echo '  Run test_materials_database for full list'; \
+    echo ''; \
+    echo 'Examples in: /workspace/examples/'; \
+    echo 'Documentation: /workspace/docs/'; \
+    echo ''; \
+    exec bash \
+    "]
+
+# =============================================================================
+# Metadata Labels
+# =============================================================================
+LABEL maintainer="Aetheron Research <technical-support@aetheron-research.com>"
+LABEL version="1.0.0-phase5-7"
+LABEL description="SPINTRONIC Quantum Dynamics Framework - Complete Phase 5-7"
+LABEL license="Apache-2.0"
+LABEL org.opencontainers.image.title="SPINTRONIC Quantum Framework"
+LABEL org.opencontainers.image.description="Non-Markovian pseudomode solver for 2D materials"
+LABEL org.opencontainers.image.vendor="Aetheron Research"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.source="https://github.com/aetheron-research/spintronic-quantum"
+
+# =============================================================================
+# GPU-Enabled Variant (Uncomment CUDA sections above and use)
+# =============================================================================
+# FROM nvidia/cuda:12.0-devel-ubuntu22.04 AS builder-gpu
+# ... same as above but with CUDA support ...

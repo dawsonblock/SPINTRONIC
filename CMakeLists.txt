@@ -68,6 +68,7 @@ endif()
 # Source files
 set(SOURCES
     src/spectral_density_2d.cpp
+    src/materials_database.cpp
     src/prony_fitting.cpp
     src/quantum_state.cpp
     src/lindblad_evolution.cpp

@@ -135,6 +135,33 @@ public:
         const std::string& material,
         const std::unordered_map<std::string, double>& params = {}
     );
+    
+    // Phase 5: Extended materials database with temperature dependence
+    static std::vector<double> build_material_spectrum_T(
+        const std::vector<double>& omega,
+        const std::string& material,
+        double temperature_K
+    );
+    
+    // Custom material JSON import with diagnostics
+    static bool load_material_from_json(
+        const std::string& json_filename,
+        std::string& material_name,
+        std::unordered_map<std::string, double>& params,
+        std::string* error_message /* out, optional */
+    );
+    
+    static std::vector<double> build_custom_material_spectrum(
+        const std::vector<double>& omega,
+        const std::unordered_map<std::string, double>& params
+    );
+    
+    // Utility functions for materials database
+    static std::vector<std::string> list_available_materials();
+    
+    static std::unordered_map<std::string, double> get_material_properties(
+        const std::string& material
+    );
 };
 
 // Prony fitting for correlation function decomposition
