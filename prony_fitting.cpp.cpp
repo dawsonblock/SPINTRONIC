@@ -291,9 +291,10 @@ PronyFitter::FitResult PronyFitter::refine_parameters(
         project_onto_constraints(theta_new, K);
 
         // Check if update improves loss
-        auto [new_residuals, _] = compute_residuals_and_jacobian(
+        auto [new_residuals, jacobian_unused] = compute_residuals_and_jacobian(
             theta_new, C_data, t_grid, temperature_K
         );
+        [[maybe_unused]] auto& unused_jacobian = jacobian_unused;
         double new_loss = 0.5 * new_residuals.squaredNorm();
 
         if (new_loss < current_loss) {
