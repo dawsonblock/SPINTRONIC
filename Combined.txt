@@ -100,9 +100,9 @@ void LindbladSolver::build_hamiltonian() {
                         if (basis_j.system_state == basis_i.system_state &&
                             basis_j.bath_states == bath_states_up) {
 
-                            double matrix_element = g_k * std::sqrt(basis_states_up[k]);
+                            double matrix_element = g_k * std::sqrt(bath_states_up[k]);
                             if (system_params_.coupling == "sigma_z") {
-                                // σᵧ coupling: only diagonal in system basis
+                                // σ_z coupling: only diagonal in system basis
                                 matrix_element *= (2 * basis_i.system_state - 1);
                             }
 
