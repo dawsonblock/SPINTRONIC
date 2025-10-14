@@ -222,23 +222,20 @@ Build-ubuntu-cpu:
       
       - name: Generate Doxygen documentation
         run: |
-          mkdir -p build
-          cd build
-          doxygen ../docs/Doxyfile || echo "Doxygen config needs creation"
-      
-      - name: Upload documentation
-        uses: actions/upload-artifact@v3
-        with:
-          name: documentation
-          path: build/docs/html
-          retention-days: 30
+          # In the producer job after building:
+          # - name: Upload build artifact
+          #   uses: actions/upload-artifact@v3
+          #   with:
+          #     name: build-ubuntu-${{ matrix.compiler }}-${{ matrix.build_type }}
+          #     path: build
+          #     retention-days: 7
 
-  # =============================================================================
-  # Job 6: Performance Benchmarks
-  # =============================================================================
-  performance-benchmark:
-    name: Performance Benchmarks
-    runs-on: ubuntu-22.04
+          # In the consumer job:
+          - name: Download build artifacts (Release, gcc-11)
+            uses: actions/download-artifact@v3
+            with:
+              name: build-ubuntu-gcc-11-Release
+              path: build
     needs: build-ubuntu-cpu
     
     steps:
