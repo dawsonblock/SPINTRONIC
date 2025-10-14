@@ -40,12 +40,13 @@ metadata:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
 spec:
   type: LoadBalancer
   ports:
-  - port: 80
+  - port: 443
     targetPort: 8080
     protocol: TCP
-    name: http
+    name: https
   selector:
     app: pseudomode-framework
