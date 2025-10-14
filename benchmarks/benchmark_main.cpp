@@ -6,7 +6,7 @@
  */
 
 #include <benchmark/benchmark.h>
-#include "../include/pseudomode_solver.h"
+#include <pseudomode_solver.h>
 #include <random>
 
 using namespace PseudomodeSolver;
