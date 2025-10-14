@@ -49,11 +49,7 @@ Build-ubuntu-cpu:
           cd build
           ./test_materials_database
       
-      - name: Run CUDA Validation Tests
-        run: |
-          cd build
-          ./test_cuda_validation
-      
+# (Removed "Run CUDA Validation Tests" step as CUDA is disabled in this job)
       - name: Archive build artifacts
         uses: actions/upload-artifact@v3
         with:
