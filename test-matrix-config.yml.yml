@@ -10,10 +10,13 @@ test_matrix:
     - clang-14
     - clang-15
 
-  platforms:
-    - Ubuntu 20.04, 22.04
-    - macOS 11, 12
-    - Windows Server 2019, 2022
+    platforms:
+      - Ubuntu 20.04
+      - Ubuntu 22.04
+      - macOS 11
+      - macOS 12
+      - Windows Server 2019
+      - Windows Server 2022
 
   build_types:
     - Release (optimizations enabled)
