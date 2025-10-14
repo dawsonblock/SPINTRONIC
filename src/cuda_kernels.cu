@@ -123,7 +123,7 @@ __global__ void lindblad_evolution_kernel(
  * @warning Caller must ensure blockDim.x <= MAX_BLOCK_SIZE
  * @note After kernel, host must perform final reduction over result_blocks
  */
-#define MAX_BLOCK_SIZE 1024
+constexpr int MAX_BLOCK_SIZE = 1024;
 __global__ void expectation_value_kernel(
     const cuDoubleComplex* observable_diag,
     const cuDoubleComplex* state_diag,
