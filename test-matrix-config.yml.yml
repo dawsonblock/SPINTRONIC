@@ -18,10 +18,13 @@ test_matrix:
       - Windows Server 2019
       - Windows Server 2022
 
-  build_types:
-    - Release (optimizations enabled)
-    - Debug (full debugging info)
-    - RelWithDebInfo (optimized with debug symbols)
+    build_types:
+      - Release
+      - Debug
+      - RelWithDebInfo
+    # Release: optimizations enabled
+    # Debug: full debugging info
+    # RelWithDebInfo: optimized with debug symbols
 
   feature_combinations:
     - CUDA + OpenMP + JSON
