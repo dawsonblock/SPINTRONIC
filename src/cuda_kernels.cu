@@ -136,7 +136,7 @@ __global__ void expectation_value_kernel(
     extern __shared__ cuDoubleComplex shared_data[];
     
     // SECURITY: Validate thread index
-    if (threadIdx.x >= MAX_BLOCK_SIZE) {
+    if (threadIdx.x >= blockDim.x) {
         return;
     }
 
