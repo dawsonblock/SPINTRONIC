@@ -207,27 +207,7 @@ Build-ubuntu-cpu:
                   sudo apt-get install -y doxygen graphviz
               - name: Download build artifacts (Release, gcc-11)
                 uses: actions/download-artifact@v3
-                with:
-                  name: build-ubuntu-gcc-11-Release
-                  path: build
-              - name: Generate Doxygen documentation
-                run: |
-                  doxygen Doxyfile
-      - name: Make executables executable
-        run: chmod +x build/*
-      
-      - name: Run benchmark suite
-        run: |
-          echo "Performance benchmarks would run here"
-          echo "Example: ./build/benchmark_pseudomode --benchmark_format=json"
-
-  # =============================================================================
-  # Job 7: Static Analysis
-  # =============================================================================
-  static-analysis:
-    name: Static Code Analysis
-    runs-on: ubuntu-22.04
-    
+                  docker save spintronic-quantum:test | gzip > spintronic-quantum-test.tar.gz
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
