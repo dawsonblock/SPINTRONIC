@@ -13,7 +13,7 @@ namespace PseudomodeSolver {
 
 namespace Utils {
 
-void fft_correlation_to_spectrum(
+void fft_spectrum_to_correlation(
     const std::vector<double>& J_omega,
     std::vector<Complex>& correlation) {
 
