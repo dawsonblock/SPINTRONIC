@@ -171,8 +171,8 @@ int main(int argc, char** argv){
         if (dim == Dimensionality::D3) {
             spec.mat_3d = MaterialDatabase::load_material(material, dim, materials_file).mat_3d;
         } else {
-            // Load 2D material (placeholder - use existing loader)
-            spec.mat_2d = {}; // Load from 2D database
+            // Load 2D material
+            spec.mat_2d = MaterialDatabase::load_material(material, dim, materials_file).mat_2d;
         }
 
         // Initialize framework
