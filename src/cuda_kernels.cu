@@ -194,7 +194,7 @@ __global__ void compute_occupation_numbers(
     int level = threadIdx.x;
 
     // SECURITY: Validate indices to prevent out-of-bounds access
-    if (mode < n_modes && level < n_max && mode >= 0 && level >= 0) {
+    if (mode < n_modes && level < n_max) {
         // Extract pseudomode density matrix elements
         double occupation = 0.0;
 
@@ -203,15 +203,12 @@ __global__ void compute_occupation_numbers(
         int state_idx = mode * n_max + level;
         
         // SECURITY: Bounds check before array access
-        if (state_idx >= 0 && state_idx < total_dim) {
+        if (state_idx < total_dim) {
             cuDoubleComplex state_element = pseudomode_states[state_idx];
             double abs_val = cuCabs(state_element);
             occupation = abs_val * abs_val * level;
             
-            // SECURITY: Validate occupation_numbers array bounds
-            if (mode < n_modes) {
-                atomicAdd(&occupation_numbers[mode], occupation);
-            }
+            atomicAdd(&occupation_numbers[mode], occupation);
         }
     }
 }
