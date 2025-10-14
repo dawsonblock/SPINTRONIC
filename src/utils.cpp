@@ -17,12 +17,11 @@ namespace {
         const int N = input.size();
         output.resize(N);
         const double sign = inverse ? 1.0 : -1.0;
-        const double PI = 3.14159265358979323846;
         
         for (int k = 0; k < N; ++k) {
             output[k] = std::complex<double>(0.0, 0.0);
             for (int n = 0; n < N; ++n) {
-                double angle = sign * 2.0 * PI * k * n / N;
+                double angle = sign * 2.0 * M_PI * k * n / N;
                 output[k] += input[n] * std::exp(std::complex<double>(0.0, angle));
             }
             if (inverse) {
