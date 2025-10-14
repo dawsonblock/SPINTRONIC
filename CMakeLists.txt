@@ -136,9 +136,11 @@ add_executable(pseudomode_cli src/main.cpp)
 
 # CLI needs to link the library and Eigen headers
 # CLI needs to link the library and Eigen headers
-target_link_libraries(pseudomode_cli pseudomode_framework)
-if(Eigen3_FOUND)
-    target_link_libraries(pseudomode_cli PRIVATE Eigen3::Eigen)
+    target_link_libraries(pseudomode_cli pseudomode_framework Eigen3::Eigen)
+    target_compile_definitions(pseudomode_cli PRIVATE PSEUDOMODE_HAVE_EIGEN=1)
+else()
+    target_link_libraries(pseudomode_cli pseudomode_framework)
+    target_compile_definitions(pseudomode_cli PRIVATE PSEUDOMODE_HAVE_EIGEN=0)
 endif()
 
 install(TARGETS pseudomode_cli
