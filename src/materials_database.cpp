@@ -616,11 +616,6 @@ bool SpectralDensity2D::load_material_from_json(
     }
     
     return !material_name.empty();
-}
-
-// ============================================================================
-// Custom material spectrum builder
-// ============================================================================
 
 std::vector<double> SpectralDensity2D::build_custom_material_spectrum(
     const std::vector<double>& omega,
