@@ -51,3 +51,5 @@ doxygen_output/
 *.tmp
 *.bak
 *.log
+core
+core.*
