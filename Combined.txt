@@ -415,9 +415,22 @@ CoherenceTimes LindbladSolver::extract_coherence_times(
         if (!coherence.valid) {
             coherence.T2_star_ps = std::numeric_limits<double>::infinity();
             coherence.valid = true;
+        // Initialize cuBLAS and cuSPARSE with error handling
+        cublasStatus_t cb_status = cublasCreate(&cublas_handle_);
+        if (cb_status != CUBLAS_STATUS_SUCCESS) {
+            std::cerr << "cublasCreate failed" << std::endl;
+            cudaFree(d_state_); d_state_ = nullptr;
+            cudaFree(d_temp_);  d_temp_  = nullptr;
+            throw std::runtime_error("Failed to initialize cuBLAS");
         }
-
-    } catch (...) {
+        cusparseStatus_t cs_status = cusparseCreate(&cusparse_handle_);
+        if (cs_status != CUSPARSE_STATUS_SUCCESS) {
+            std::cerr << "cusparseCreate failed" << std::endl;
+            cublasDestroy(cublas_handle_); cublas_handle_ = nullptr;
+            cudaFree(d_state_); d_state_ = nullptr;
+            cudaFree(d_temp_);  d_temp_  = nullptr;
+            throw std::runtime_error("Failed to initialize cuSPARSE");
+        }
         coherence.T2_star_ps = 0.0;
         coherence.valid = false;
     }
