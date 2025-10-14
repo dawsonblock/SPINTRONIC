@@ -437,14 +437,33 @@ config_cpu.use_gpu = False
 config_gpu = pm.SimulationConfig()
 config_gpu.use_gpu = True
 
+import time
+import numpy as np
+import pseudomode_py as pm
+
+# Define grids and system
+omega = np.linspace(0.001, 0.2, 2000)
+time_grid = np.logspace(-2, 2, 500)
+system = pm.System2DParams()
+system.temperature_K = 300.0
+
+# Setup frameworks
+config_cpu = pm.SimulationConfig()
+config_cpu.use_gpu = False
+framework_cpu = pm.PseudomodeFramework2D(config_cpu)
+
+config_gpu = pm.SimulationConfig()
+config_gpu.use_gpu = True
+framework_gpu = pm.PseudomodeFramework2D(config_gpu)
+
 # CPU timing
 t0 = time.time()
-result_cpu = framework_cpu.simulate_material("GaAs", system, omega, time)
+result_cpu = framework_cpu.simulate_material("GaAs", system, omega, time_grid)
 cpu_time = time.time() - t0
 
 # GPU timing
 t0 = time.time()
-result_gpu = framework_gpu.simulate_material("GaAs", system, omega, time)
+result_gpu = framework_gpu.simulate_material("GaAs", system, omega, time_grid)
 gpu_time = time.time() - t0
 
 print(f"CPU time: {cpu_time:.2f} s")
