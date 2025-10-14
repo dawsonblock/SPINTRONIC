@@ -132,11 +132,12 @@ __global__ void expectation_value_kernel(
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // SECURITY FIX: Dynamic shared memory allocation to prevent buffer overflow
+    // Dynamic shared memory allocation; ensure block size does not exceed limit
     extern __shared__ cuDoubleComplex shared_data[];
-    
-    // SECURITY: Validate thread index
-    if (threadIdx.x >= blockDim.x) {
+
+    // Enforce safe block size for all threads in the block
+    if (blockDim.x > MAX_BLOCK_SIZE) {
+        // Abort entire block deterministically
         return;
     }
 
@@ -150,11 +151,11 @@ __global__ void expectation_value_kernel(
     shared_data[threadIdx.x] = local_sum;
     __syncthreads();
 
-    // Parallel reduction in shared memory
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    // Parallel reduction in shared memory over active threads
+    for (int s = blockDim.x >> 1; s > 0; s >>= 1) {
         if (threadIdx.x < s) {
             shared_data[threadIdx.x] = cuCadd(
-                shared_data[threadIdx.x], 
+                shared_data[threadIdx.x],
                 shared_data[threadIdx.x + s]
             );
         }
