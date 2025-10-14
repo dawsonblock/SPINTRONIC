@@ -604,19 +604,17 @@ bool SpectralDensity2D::load_material_from_json(
         return !material_name.empty();
         params[key] = value;
     }
-
-    return !material_name.empty();
+        while (ok && *endptr != '\0') {
+            if (!std::isspace(static_cast<unsigned char>(*endptr))) {
+                ok = false;
+                break;
             }
+            ++endptr;
         }
-    }
-    
-    return !material_name.empty();
 
-std::vector<double> SpectralDensity2D::build_custom_material_spectrum(
-    const std::vector<double>& omega,
-    const std::unordered_map<std::string, double>& params) {
-    
-    std::vector<double> J_total(omega.size(), 0.0);
+        if (ok) {
+            params[key] = value;
+        }
     
     // Extract acoustic parameters
     double alpha_ac = params.count("alpha_ac") ? params.at("alpha_ac") : 0.01;
