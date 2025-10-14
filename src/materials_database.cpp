@@ -514,19 +514,28 @@ std::vector<double> SpectralDensity2D::build_material_spectrum_T(
     // Combine contributions
     std::vector<double> J_total(omega.size(), 0.0);
     
-    // Combine acoustic and flexural contributions
+    // Combine acoustic and flexural in a single parallel loop
     #pragma omp parallel for
     for (size_t i = 0; i < omega.size(); ++i) {
         J_total[i] = J_ac[i] + J_flex[i];
     }
 
-    // Accumulate optical peaks in a single pass to avoid nested parallel regions
-    std::vector<double> J_opt_sum(omega.size(), 0.0);
-    for (size_t j = 0; j < params.omega_opt.size(); ++j) {
-        double gamma_Tj = params.gamma_opt[j] * gamma_scale;
-        auto J_opt_j = lorentzian_peak(omega, params.omega_opt[j], params.lambda_opt[j], gamma_Tj);
+    // Accumulate all optical peaks safely without nested parallel regions
+    if (!params.omega_opt.empty()) {
+        // Precompute sum of optical contributions per omega (no nested parallel regions)
+        std::vector<double> J_opt_sum(omega.size(), 0.0);
+        for (size_t j = 0; j < params.omega_opt.size(); ++j) {
+            double gamma_T = params.gamma_opt[j] * gamma_scale;
+            auto J_opt = lorentzian_peak(omega, params.omega_opt[j], params.lambda_opt[j], gamma_T);
+            // Accumulate serially per peak into J_opt_sum; this avoids data races
+            for (size_t i = 0; i < omega.size(); ++i) {
+                J_opt_sum[i] += J_opt[i];
+            }
+        }
+        // Single parallel add to J_total
+        #pragma omp parallel for
         for (size_t i = 0; i < omega.size(); ++i) {
-            J_opt_sum[i] += J_opt_j[i];
+            J_total[i] += J_opt_sum[i];
         }
     }
 
