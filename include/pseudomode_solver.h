@@ -24,6 +24,8 @@
 #include <string>
 #include <unordered_map>
 #include <chrono>
+#include <utility>
+#include <Eigen/Dense>
 
 // CUDA support (optional compilation)
 #ifdef USE_CUDA
@@ -161,12 +163,52 @@ private:
         int K
     );
 
+    // Initial Prony fit
+    static FitResult fit_prony_initial(
+        const std::vector<Complex>& C_data,
+        const std::vector<double>& t_grid,
+        int K
+    );
+
+    // Find polynomial roots (for Prony method)
+    static std::vector<Complex> find_polynomial_roots(
+        const Eigen::VectorXcd& coeffs
+    );
+
     // Constrained refinement using Levenberg-Marquardt
     static FitResult refine_parameters(
         const std::vector<PseudomodeParams>& initial_params,
         const std::vector<Complex>& C_data,
         const std::vector<double>& t_grid,
         double temperature_K
+    );
+
+    // Compute residuals and Jacobian for refinement
+    static std::pair<Eigen::VectorXd, Eigen::MatrixXd> compute_residuals_and_jacobian(
+        const Eigen::VectorXd& theta,
+        const std::vector<Complex>& C_data,
+        const std::vector<double>& t_grid,
+        double temperature_K
+    );
+
+    // Add soft constraint penalties to residuals
+    static void add_constraint_penalties(
+        const Eigen::VectorXd& theta,
+        Eigen::VectorXd& residuals,
+        double temperature_K
+    );
+
+    // Compute Jacobian matrix for refinement
+    static Eigen::MatrixXd compute_jacobian(
+        const Eigen::VectorXd& theta,
+        const std::vector<double>& t_grid,
+        double temperature_K
+    );
+
+    // Project parameters onto physical constraints
+    static void project_onto_constraints(
+        Eigen::VectorXd& theta,
+        int K
     );
 
     // BIC model selection
@@ -193,6 +235,16 @@ public:
 
     // Partial trace over pseudomodes (extract system density matrix)
     std::unique_ptr<QuantumState> partial_trace_system() const;
+
+    // Accessors for evolution (needed by LindbladEvolution)
+    ComplexVector& get_state_vector() { return state_vector_; }
+    const ComplexVector& get_state_vector() const { return state_vector_; }
+    int get_total_dim() const { return total_dim_; }
+
+#ifdef USE_CUDA
+    cuDoubleComplex* get_gpu_data() { return d_state_vector_; }
+    const cuDoubleComplex* get_gpu_data() const { return d_state_vector_; }
+#endif
 
 private:
     int sys_dim_, n_modes_, n_max_, total_dim_;
@@ -274,6 +326,35 @@ private:
         const ComplexVector& input,
         ComplexVector& output
     ) const;
+
+    // Lindbladian action computation
+    void compute_lindbladian_action(
+        const ComplexVector& state,
+        ComplexVector& lindblad_state
+    ) const;
+
+    // Helper functions for operator construction
+    int get_pseudomode_occupation(int state_index, int mode_index, int n_max) const;
+    
+    std::unique_ptr<SparseMatrix> build_annihilation_operator(
+        const PseudomodeParams& mode,
+        double prefactor
+    ) const;
+    
+    std::unique_ptr<SparseMatrix> build_creation_operator(
+        const PseudomodeParams& mode,
+        double prefactor
+    ) const;
+    
+    void build_pauli_operators(
+        SparseMatrix& sigma_x,
+        SparseMatrix& sigma_y,
+        SparseMatrix& sigma_z
+    ) const;
+
+    // Coherence time fitting
+    double extract_exponential_decay_time(const std::vector<Complex>& observable_vals) const;
+    double extract_gaussian_decay_time(const std::vector<Complex>& observable_vals) const;
 };
 
 // High-level interface

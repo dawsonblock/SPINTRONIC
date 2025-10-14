@@ -289,4 +289,166 @@ void LindbladEvolution::cleanup_gpu_resources() {
 }
 #endif
 
+// Helper function implementations (stubs for complete build)
+
+int LindbladEvolution::get_pseudomode_occupation(int state_index, int mode_index, int n_max) const {
+    // Extract occupation number for a given pseudomode from composite state index
+    // In tensor product basis |sys⟩ ⊗ |n₁⟩ ⊗ |n₂⟩ ⊗ ... ⊗ |nₖ⟩
+    // This is a simplified implementation
+    // Assume system is 2-dimensional (spin-1/2 or valley states)
+    int sys_dim = 2;
+    int bath_index = state_index / sys_dim;
+    int divisor = 1;
+    for (int k = 0; k < mode_index; ++k) {
+        divisor *= n_max;
+    }
+    return (bath_index / divisor) % n_max;
+}
+
+std::unique_ptr<SparseMatrix> LindbladEvolution::build_annihilation_operator(
+    const PseudomodeParams& mode,
+    double prefactor) const {
+    // Build annihilation operator a_k for a specific pseudomode
+    // a|n⟩ = √n |n-1⟩
+    int n_max = config_.adaptive_n_max;
+    auto op = std::make_unique<SparseMatrix>(n_max, n_max);
+    
+    for (int n = 1; n < n_max; ++n) {
+        double matrix_element = prefactor * std::sqrt(static_cast<double>(n));
+        op->values.push_back(Complex(matrix_element, 0.0));
+        op->col_indices.push_back(n);
+        op->row_ptrs[n] = op->values.size();
+    }
+    op->nnz = op->values.size();
+    
+    return op;
+}
+
+std::unique_ptr<SparseMatrix> LindbladEvolution::build_creation_operator(
+    const PseudomodeParams& mode,
+    double prefactor) const {
+    // Build creation operator a_k† for a specific pseudomode
+    // a†|n⟩ = √(n+1) |n+1⟩
+    int n_max = config_.adaptive_n_max;
+    auto op = std::make_unique<SparseMatrix>(n_max, n_max);
+    
+    for (int n = 0; n < n_max - 1; ++n) {
+        double matrix_element = prefactor * std::sqrt(static_cast<double>(n + 1));
+        op->values.push_back(Complex(matrix_element, 0.0));
+        op->col_indices.push_back(n + 1);
+        op->row_ptrs[n] = op->values.size();
+    }
+    op->nnz = op->values.size();
+    
+    return op;
+}
+
+void LindbladEvolution::build_pauli_operators(
+    SparseMatrix& sigma_x,
+    SparseMatrix& sigma_y,
+    SparseMatrix& sigma_z) const {
+    // Pauli matrices in sparse format
+    
+    // σ_x = |0⟩⟨1| + |1⟩⟨0|
+    sigma_x.values = {Complex(1.0, 0.0), Complex(1.0, 0.0)};
+    sigma_x.col_indices = {1, 0};
+    sigma_x.row_ptrs = {0, 1, 2};
+    sigma_x.nnz = 2;
+    
+    // σ_y = -i|0⟩⟨1| + i|1⟩⟨0|
+    sigma_y.values = {Complex(0.0, -1.0), Complex(0.0, 1.0)};
+    sigma_y.col_indices = {1, 0};
+    sigma_y.row_ptrs = {0, 1, 2};
+    sigma_y.nnz = 2;
+    
+    // σ_z = |0⟩⟨0| - |1⟩⟨1|
+    sigma_z.values = {Complex(1.0, 0.0), Complex(-1.0, 0.0)};
+    sigma_z.col_indices = {0, 1};
+    sigma_z.row_ptrs = {0, 1, 2};
+    sigma_z.nnz = 2;
+}
+
+double LindbladEvolution::extract_exponential_decay_time(
+    const std::vector<Complex>& observable_vals) const {
+    // Fit exponential decay: |⟨O(t)⟩| ≈ O₀ exp(-t/T₁)
+    // Simple least-squares fit in log space
+    
+    if (observable_vals.size() < 3) {
+        return 0.0;
+    }
+    
+    std::vector<double> log_vals;
+    std::vector<double> times;
+    
+    for (size_t i = 0; i < observable_vals.size(); ++i) {
+        double mag = std::abs(observable_vals[i]);
+        if (mag > 1e-10) {
+            log_vals.push_back(std::log(mag));
+            times.push_back(i * config_.time_step_ps);
+        }
+    }
+    
+    if (log_vals.size() < 2) {
+        return 0.0;
+    }
+    
+    // Linear regression: log|O| = a - t/T₁
+    double sum_t = 0.0, sum_log = 0.0, sum_t2 = 0.0, sum_t_log = 0.0;
+    int n = log_vals.size();
+    
+    for (int i = 0; i < n; ++i) {
+        sum_t += times[i];
+        sum_log += log_vals[i];
+        sum_t2 += times[i] * times[i];
+        sum_t_log += times[i] * log_vals[i];
+    }
+    
+    double slope = (n * sum_t_log - sum_t * sum_log) / (n * sum_t2 - sum_t * sum_t);
+    
+    // slope = -1/T₁, so T₁ = -1/slope (convert fs to ps)
+    return (slope < 0.0) ? -1000.0 / slope : 0.0;
+}
+
+double LindbladEvolution::extract_gaussian_decay_time(
+    const std::vector<Complex>& observable_vals) const {
+    // Fit Gaussian decay: |⟨O(t)⟩| ≈ O₀ exp(-(t/T₂*)²)
+    // Simple least-squares fit in log space
+    
+    if (observable_vals.size() < 3) {
+        return 0.0;
+    }
+    
+    std::vector<double> log_vals;
+    std::vector<double> times_squared;
+    
+    for (size_t i = 0; i < observable_vals.size(); ++i) {
+        double mag = std::abs(observable_vals[i]);
+        if (mag > 1e-10) {
+            log_vals.push_back(std::log(mag));
+            double t = i * config_.time_step_ps;
+            times_squared.push_back(t * t);
+        }
+    }
+    
+    if (log_vals.size() < 2) {
+        return 0.0;
+    }
+    
+    // Linear regression: log|O| = a - t²/T₂*²
+    double sum_t2 = 0.0, sum_log = 0.0, sum_t4 = 0.0, sum_t2_log = 0.0;
+    int n = log_vals.size();
+    
+    for (int i = 0; i < n; ++i) {
+        sum_t2 += times_squared[i];
+        sum_log += log_vals[i];
+        sum_t4 += times_squared[i] * times_squared[i];
+        sum_t2_log += times_squared[i] * log_vals[i];
+    }
+    
+    double slope = (n * sum_t2_log - sum_t2 * sum_log) / (n * sum_t4 - sum_t2 * sum_t2);
+    
+    // slope = -1/T₂*², so T₂* = sqrt(-1/slope) (convert fs to ps)
+    return (slope < 0.0) ? 1000.0 * std::sqrt(-1.0 / slope) : 0.0;
+}
+
 } // namespace PseudomodeSolver

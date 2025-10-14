@@ -44,32 +44,8 @@ QuantumState::QuantumState(int system_dim, int n_pseudomodes, int n_max)
     d_state_vector_ = nullptr;
 #endif
 
-    // safe integer exponentiation
-    auto int_pow = [](int base, int exp) {
-        int result = 1;
-        while (exp > 0) {
-            if (exp & 1) {
-                if (result > std::numeric_limits<int>::max() / base) {
-                    throw std::overflow_error("Index computation overflow in excited_index");
-                }
-                result *= base;
-            }
-            exp >>= 1;
-            if (exp) {
-                if (base > 0 && base > std::numeric_limits<int>::max() / base) {
-                    throw std::overflow_error("Index computation overflow in excited_index");
-                }
-                base *= base;
-            }
-        }
-        return result;
-    };
-    int excited_index = int_pow(n_max_, n_modes_);
-    if (excited_index < 0 || excited_index >= total_dim_) {
-        throw std::out_of_range("excited_index out of bounds");
-    }
-    state_vector_[excited_index] = Complex(1.0, 0.0);
-              << ", total_dim=" << total_dim_ << std::endl;
+    // Initialize to ground state: first element is |0,0,...,0>
+    state_vector_[0] = Complex(1.0, 0.0);
 }
 
 QuantumState::~QuantumState() {
@@ -162,16 +138,31 @@ Complex QuantumState::expectation_value(const SparseMatrix& observable) const {
     Complex expectation(0.0, 0.0);
 
     // ⟨ψ|O|ψ⟩ for pure states
-    #pragma omp parallel for reduction(+:expectation)
-    for (int i = 0; i < observable.rows; ++i) {
-        Complex row_sum(0.0, 0.0);
+    // Note: OpenMP reduction on complex types requires manual accumulation
+    std::vector<Complex> partial_sums(omp_get_max_threads(), Complex(0.0, 0.0));
+    
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        Complex local_sum(0.0, 0.0);
+        
+        #pragma omp for
+        for (int i = 0; i < observable.rows; ++i) {
+            Complex row_sum(0.0, 0.0);
 
-        for (int j = observable.row_ptrs[i]; j < observable.row_ptrs[i + 1]; ++j) {
-            int col = observable.col_indices[j];
-            row_sum += observable.values[j] * state_vector_[col];
+            for (int j = observable.row_ptrs[i]; j < observable.row_ptrs[i + 1]; ++j) {
+                int col = observable.col_indices[j];
+                row_sum += observable.values[j] * state_vector_[col];
+            }
+
+            local_sum += std::conj(state_vector_[i]) * row_sum;
         }
-
-        expectation += std::conj(state_vector_[i]) * row_sum;
+        
+        partial_sums[thread_id] = local_sum;
+    }
+    
+    for (const auto& sum : partial_sums) {
+        expectation += sum;
     }
 
     return expectation;

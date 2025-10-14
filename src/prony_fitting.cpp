@@ -396,4 +396,95 @@ double PronyFitter::compute_bic(const FitResult& fit, int n_data_points) {
     return p * std::log(n_data_points) - 2.0 * log_likelihood;
 }
 
+// Helper function stubs (implementations may be refined based on physics requirements)
+void PronyFitter::add_constraint_penalties(
+    const Eigen::VectorXd& theta,
+    Eigen::VectorXd& residuals,
+    double temperature_K) {
+    // Add soft constraints for physical validity (γₖ > 0, ηₖ > 0)
+    // This is a placeholder - refinements can be added later
+    const int K = theta.size() / 3;
+    const double penalty_weight = 100.0;
+    
+    for (int k = 0; k < K; ++k) {
+        double gamma = theta(K + k);
+        double eta = theta(2*K + k);
+        
+        // Penalize negative damping rates
+        if (gamma < 0) {
+            residuals.conservativeResize(residuals.size() + 1);
+            residuals(residuals.size() - 1) = penalty_weight * (-gamma);
+        }
+        
+        // Penalize negative coupling strengths
+        if (eta < 0) {
+            residuals.conservativeResize(residuals.size() + 1);
+            residuals(residuals.size() - 1) = penalty_weight * (-eta);
+        }
+    }
+}
+
+Eigen::MatrixXd PronyFitter::compute_jacobian(
+    const Eigen::VectorXd& theta,
+    const std::vector<double>& t_grid,
+    double temperature_K) {
+    
+    const int K = theta.size() / 3;
+    const int M = t_grid.size();
+    
+    // Jacobian matrix: rows = 2*M (real + imag), cols = 3*K (ω, γ, η)
+    Eigen::MatrixXd jacobian = Eigen::MatrixXd::Zero(2 * M, 3 * K);
+    
+    Eigen::VectorXd omega = theta.segment(0, K);
+    Eigen::VectorXd gamma = theta.segment(K, K);
+    Eigen::VectorXd eta = theta.segment(2*K, K);
+    
+    // Analytic derivatives of C_model with respect to parameters
+    for (int i = 0; i < M; ++i) {
+        double t = t_grid[i];
+        
+        for (int k = 0; k < K; ++k) {
+            Complex exponent = -(gamma(k) + Complex(0.0, omega(k))) * t;
+            Complex exp_val = std::exp(exponent);
+            
+            // ∂C/∂ωₖ = -i t ηₖ exp(-(γₖ + iωₖ)t)
+            Complex d_omega = -Complex(0.0, 1.0) * t * eta(k) * exp_val;
+            jacobian(i, k) = -std::real(d_omega);  // Negative for residual
+            jacobian(i + M, k) = -std::imag(d_omega);
+            
+            // ∂C/∂γₖ = -t ηₖ exp(-(γₖ + iωₖ)t)
+            Complex d_gamma = -t * eta(k) * exp_val;
+            jacobian(i, K + k) = -std::real(d_gamma);
+            jacobian(i + M, K + k) = -std::imag(d_gamma);
+            
+            // ∂C/∂ηₖ = exp(-(γₖ + iωₖ)t)
+            jacobian(i, 2*K + k) = -std::real(exp_val);
+            jacobian(i + M, 2*K + k) = -std::imag(exp_val);
+        }
+    }
+    
+    return jacobian;
+}
+
+void PronyFitter::project_onto_constraints(
+    Eigen::VectorXd& theta,
+    int K) {
+    // Project parameters to ensure physical validity
+    
+    // ω (frequencies) can be any value
+    // γ (damping rates) must be positive
+    for (int k = 0; k < K; ++k) {
+        if (theta(K + k) < 1e-10) {
+            theta(K + k) = 1e-10;  // Small positive value
+        }
+    }
+    
+    // η (coupling strengths) must be positive
+    for (int k = 0; k < K; ++k) {
+        if (theta(2*K + k) < 1e-10) {
+            theta(2*K + k) = 1e-10;
+        }
+    }
+}
+
 } // namespace PseudomodeSolver
