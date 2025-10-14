@@ -202,25 +202,32 @@ __global__ void compute_occupation_numbers(
     int total_dim) {
 
     int mode = blockIdx.x;
-    int level = threadIdx.x;
 
-    // SECURITY: Validate indices to prevent out-of-bounds access
-    if (mode < n_modes && level < n_max) {
-        // Extract pseudomode density matrix elements
-        double occupation = 0.0;
+     if (mode >= n_modes || level >= n_max) {
+         return;
+     }
 
-        // Compute ⟨a_k† a_k⟩ = Tr[ρ a_k† a_k]
-        // This is simplified - full implementation would use proper indexing
-        int state_idx = mode * n_max + level;
-        
-        // SECURITY: Bounds check before array access
-        if (state_idx < total_dim) {
-            cuDoubleComplex state_element = pseudomode_states[state_idx];
-            double abs_val = cuCabs(state_element);
-            occupation = abs_val * abs_val * level;
-            
-            atomicAdd(&occupation_numbers[mode], occupation);
-        }
+     // Ensure the accumulator exists; require caller to zero before launch or zero per-block here
+     if (level == 0) {
+         // Optional per-launch zeroing; comment out if zeroed on host for performance
+         // occupation_numbers[mode] = 0.0;
+     }
+     __syncthreads();
+
+     // Flat indexing sanity check: ensure we don't read beyond provided state buffer
+     int state_idx = mode * n_max + level;
+     if (state_idx < 0 || state_idx >= total_dim) {
+         return;
+     }
+
+     cuDoubleComplex state_element = pseudomode_states[state_idx];
+     double abs_val = cuCabs(state_element);
+     double occupation = abs_val * abs_val * static_cast<double>(level);
+
+     // Guard atomic target pointer
+     if (mode >= 0 && mode < n_modes) {
+         atomicAdd(&occupation_numbers[mode], occupation);
+     }
     }
 }
 
