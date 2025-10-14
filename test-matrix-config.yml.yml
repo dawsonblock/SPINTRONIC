@@ -7,8 +7,8 @@ test_matrix:
     - gcc-12
     - clang-12
     - clang-13
-   - clang-14
-   - clang-15
+    - clang-14
+    - clang-15
 
   platforms:
     - Ubuntu 20.04, 22.04
