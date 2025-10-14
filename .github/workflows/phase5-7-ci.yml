@@ -1,4 +1,7 @@
 name: Phase 5-7 CI/CD Pipeline
+# This workflow builds and tests the SPINTRONIC quantum dynamics framework
+# Eigen3 installation is handled by a reusable composite action at:
+# .github/actions/install-eigen3/action.yml
 
 on:
   push:
