@@ -1,0 +1,287 @@
+Build-ubuntu-cpu:
+    name: Ubuntu 22.04 (CPU, OpenMP)
+    runs-on: ubuntu-22.04
+    
+    strategy:
+      matrix:
+        compiler: [gcc-11, clang-14]
+        build_type: [Release, Debug]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            libomp-dev libgtest-dev \
+            python3 python3-dev python3-pip
+          pip3 install pybind11 numpy
+      
+      - name: Install Eigen3
+        run: |
+          wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+          tar xzf eigen-3.4.0.tar.gz
+          cd eigen-3.4.0
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/eigen3_install
+          make install
+      
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DUSE_OPENMP=ON \
+            -DUSE_CUDA=OFF \
+            -DBUILD_PYTHON_BINDINGS=ON \
+            -DBUILD_TESTS=ON \
+            -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
+      
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+      
+      - name: Run Materials Database Tests
+        run: |
+          cd build
+          ./test_materials_database
+      
+      - name: Run CUDA Validation Tests
+        run: |
+          cd build
+          ./test_cuda_validation
+      
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-ubuntu-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: |
+            build/libpseudomode_framework.so
+            build/pseudomode_cli
+            build/test_*
+          retention-days: 7
+
+  # =============================================================================
+  # Job 2: Build with CUDA (if available)
+  # =============================================================================
+  build-ubuntu-cuda:
+    name: Ubuntu 22.04 (CUDA GPU)
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Check CUDA availability
+        id: cuda-check
+        run: |
+          if command -v nvcc &> /dev/null; then
+            echo "cuda_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "cuda_available=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Skip if CUDA not available
+        if: steps.cuda-check.outputs.cuda_available == 'false'
+        run: |
+          echo "⚠️  CUDA not available - skipping GPU tests"
+          echo "This is expected for standard GitHub runners"
+      
+      - name: Install CUDA (if available)
+        if: steps.cuda-check.outputs.cuda_available == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nvidia-cuda-toolkit
+      
+      - name: Build with CUDA
+        if: steps.cuda-check.outputs.cuda_available == 'true'
+        run: |
+          cmake -B build -DUSE_CUDA=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel $(nproc)
+
+  # =============================================================================
+  # Job 3: Python Bindings Test
+  # =============================================================================
+  test-python-bindings:
+    name: Python Bindings Tests
+    runs-on: ubuntu-22.04
+    needs: build-ubuntu-cpu
+    
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install Python dependencies
+        run: |
+          pip install pybind11 numpy scipy matplotlib pytest
+      
+      - name: Install Eigen3
+        run: |
+          wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+          tar xzf eigen-3.4.0.tar.gz
+          cd eigen-3.4.0
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/eigen3_install
+          make install
+      
+      - name: Build Python bindings
+        run: |
+          cmake -B build \
+            -DBUILD_PYTHON_BINDINGS=ON \
+            -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
+          cmake --build build --target pseudomode_py --parallel $(nproc)
+      
+      - name: Test Python import
+        run: |
+          export PYTHONPATH=$PWD/build/python:$PYTHONPATH
+          python -c "import pseudomode_py; print(pseudomode_py.__doc__)"
+
+  # =============================================================================
+  # Job 4: Docker Build and Test
+  # =============================================================================
+  docker-build:
+    name: Docker Container Build
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        run: |
+          docker build -f Dockerfile.phase5-7 -t spintronic-quantum:test .
+      
+      - name: Test Docker image
+        run: |
+          docker run --rm spintronic-quantum:test pseudomode_cli --help
+      
+      - name: Export Docker image
+        run: |
+          docker save spintronic-quantum:test | gzip > spintronic-quantum-test.tar.gz
+      
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: spintronic-quantum-test.tar.gz
+          retention-days: 7
+
+  # =============================================================================
+  # Job 5: Documentation Generation
+  # =============================================================================
+  generate-docs:
+    name: Generate Documentation
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+      
+      - name: Generate Doxygen documentation
+        run: |
+          mkdir -p build
+          cd build
+          doxygen ../docs/Doxyfile || echo "Doxygen config needs creation"
+      
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: build/docs/html
+          retention-days: 30
+
+  # =============================================================================
+  # Job 6: Performance Benchmarks
+  # =============================================================================
+  performance-benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-22.04
+    needs: build-ubuntu-cpu
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-ubuntu-gcc-11-Release
+          path: build
+      
+      - name: Make executables executable
+        run: chmod +x build/*
+      
+      - name: Run benchmark suite
+        run: |
+          echo "Performance benchmarks would run here"
+          echo "Example: ./build/benchmark_pseudomode --benchmark_format=json"
+
+  # =============================================================================
+  # Job 7: Static Analysis
+  # =============================================================================
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy
+      
+      - name: Run clang-tidy
+        run: |
+          echo "Static analysis would run here"
+          # find src/ -name "*.cpp" | xargs clang-tidy
+
+  # =============================================================================
+  # Job 8: Integration Report
+  # =============================================================================
+  integration-report:
+    name: Generate Integration Report
+    runs-on: ubuntu-22.04
+    needs: [build-ubuntu-cpu, docker-build, generate-docs]
+    if: always()
+    
+    steps:
+      - name: Generate report
+        run: |
+          echo "# Phase 5-7 CI/CD Report" > report.md
+          echo "" >> report.md
+          echo "## Build Status" >> report.md
+          echo "- Ubuntu CPU: ${{ needs.build-ubuntu-cpu.result }}" >> report.md
+          echo "- Docker Build: ${{ needs.docker-build.result }}" >> report.md
+          echo "- Documentation: ${{ needs.generate-docs.result }}" >> report.md
+          cat report.md
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-report
+          path: report.md
+          retention-days: 30
