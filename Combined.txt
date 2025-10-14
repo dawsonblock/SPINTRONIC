@@ -64,14 +64,14 @@ void LindbladSolver::build_hamiltonian() {
     // Create a temporary quantum state to access basis indexing
     QuantumState temp_state(2, pseudomodes_.size(), system_params_.n_max);
 
-    // System Hamiltonian: ω₀/2 σᵧ + bath energies
+    // System Hamiltonian: ω₀/2 σ_z + bath energies
     for (int i = 0; i < total_dim_; ++i) {
         // Diagonal elements: system + bath energies
         const auto& basis_i = temp_state.get_basis_states()[i];
 
-        // System energy: ω₀/2 σᵧ
+        // System energy: ω₀/2 σ_z
         double sys_energy = 0.5 * system_params_.omega0_eV * 
-                           (2 * basis_i.system_state - 1); // ±ω₀/2
+                           (2 * basis_i.system_state - 1); // ±ω₀/2 (σ_z eigenvalues)
 
         // Bath energies: Σₖ Ωₖ nₖ
         double bath_energy = 0.0;
