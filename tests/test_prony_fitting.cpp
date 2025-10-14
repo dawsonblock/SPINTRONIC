@@ -6,7 +6,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "../include/pseudomode_solver.h"
+#include <pseudomode_solver.h>
 #include <cmath>
 #include <random>
 
