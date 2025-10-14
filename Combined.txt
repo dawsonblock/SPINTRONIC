@@ -330,12 +330,12 @@ void LindbladSolver::add_dissipator(
     const ComplexVector& state) const {
 
     // For a state vector, the dissipative evolution (without jumps) is governed
-    // by a non-Hermitian term: -0.5 * L†L |ψ⟩
+    // by a non-Hermitian term embedded in -i H_eff |ψ⟩ with H_eff = H - i/2 Σ L†L
     ComplexMatrix L_dagger_L = matrix_matrix_mult_dagger_A_B(L, L);
     ComplexVector L_dagger_L_psi = matrix_vector_mult(L_dagger_L, state);
 
     for (size_t i = 0; i < result.size(); ++i) {
-        result[i] -= 0.5 * L_dagger_L_psi[i];
+        result[i] += Complex(0.0, -0.5) * L_dagger_L_psi[i];
     }
 }
 
