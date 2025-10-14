@@ -221,21 +221,16 @@ Build-ubuntu-cpu:
   # =============================================================================
   generate-docs:
     name: Generate Documentation
-    runs-on: ubuntu-22.04
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Install Doxygen
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y doxygen graphviz
-      
-      - name: Generate Doxygen documentation
-        run: |
-          # In the producer job after building:
-          # - name: Upload build artifact
+      run: |
+        echo "Generating documentation..."
+        doxygen Doxyfile
+
+    # To consume artifacts, define as a separate step (already present later):
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-ubuntu-gcc-11-Release
+        path: build
           #   uses: actions/upload-artifact@v3
           #   with:
           #     name: build-ubuntu-${{ matrix.compiler }}-${{ matrix.build_type }}
