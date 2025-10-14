@@ -67,9 +67,9 @@ std::vector<std::unique_ptr<QuantumState>> LindbladEvolution::evolve(
 
 #ifdef USE_CUDA
             if (config_.use_gpu) {
-                evolve_step_gpu(current_state->get_gpu_data(), dt);
+                evolve_step_gpu(current_state->get_gpu_data(), dt); // QuantumState must define get_gpu_data()
             } else {
-                evolve_step_cpu(current_state->get_state_vector(), dt);
+                evolve_step_cpu(current_state->get_state_vector(), dt); // QuantumState must define get_state_vector()
             }
 #else
             evolve_step_cpu(current_state->get_state_vector(), dt);
