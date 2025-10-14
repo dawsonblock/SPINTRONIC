@@ -315,44 +315,38 @@ void LindbladSolver::add_commutator(
     const ComplexMatrix& H,
     const ComplexVector& state) const {
 
-    // For state vector |ψ⟩: -i H |ψ⟩
-    ComplexVector H_psi = matrix_vector_mult(H, state);
+    // Use effective Hamiltonian: H_eff = H - (i/2) * Σ_k L_k^† L_k
+    const ComplexMatrix* H_eff_ptr = &H
+    ComplexMatrix H_eff_local;
 
-    for (size_t i = 0; i < result.size(); ++i) {
-        result[i] += Complex(0.0, -1.0) * H_psi[i];
-    }
-}
-
-void LindbladSolver::add_commutator(
-    ComplexVector& result,
-    const ComplexMatrix& H,
-    const ComplexVector& state) const {
-
-    // Effective Hamiltonian for non-Hermitian evolution of a state vector
-    // H_eff = H - (i/2) * Σ_k L_k^† L_k
-    ComplexMatrix H_eff = H;
-
-    for (const auto& L : lindblad_operators_) {
-        ComplexMatrix L_dag_L(total_dim_, std::vector<Complex>(total_dim_, Complex(0.0, 0.0)));
-        // This is inefficient; ideally, pre-calculate L_dag_L products
-        for (int i = 0; i < total_dim_; ++i) {
-            for (int j = 0; j < total_dim_; ++j) {
-                for (int k = 0; k < total_dim_; ++k) {
-                    L_dag_L[i][j] += std::conj(L[k][i]) * L[k][j];
+    if (!lindblad_operators_.empty()) {
+        // Use precomputed L_dag_L_sum_ if available; otherwise compute once
+        if (L_dag_L_sum_.empty()) {
+            ComplexMatrix L_sum(total_dim_, std::vector<Complex>(total_dim_, Complex(0.0, 0.0)));
+            for (const auto& L : lindblad_operators_) {
+                for (int i = 0; i < total_dim_; ++i) {
+                    for (int j = 0; j < total_dim_; ++j) {
+                        Complex acc(0.0, 0.0);
+                        for (int k = 0; k < total_dim_; ++k) {
+                            acc += std::conj(L[k][i]) * L[k][j];
+                        }
+                        L_sum[i][j] += acc;
+                    }
                 }
             }
+            L_dag_L_sum_ = std::move(L_sum);
         }
-
+        H_eff_local = H;
         for (int i = 0; i < total_dim_; ++i) {
             for (int j = 0; j < total_dim_; ++j) {
-                H_eff[i][j] -= Complex(0.0, 0.5) * L_dag_L[i][j];
+                H_eff_local[i][j] -= Complex(0.0, 0.5) * L_dag_L_sum_[i][j];
             }
         }
+        H_eff_ptr = &H_eff_local;
     }
 
     // Evolve with H_eff: d|ψ⟩/dt = -i * H_eff |ψ⟩
-    ComplexVector H_eff_psi = matrix_vector_mult(H_eff, state);
-
+    ComplexVector H_eff_psi = matrix_vector_mult(*H_eff_ptr, state);
     for (size_t i = 0; i < result.size(); ++i) {
         result[i] += Complex(0.0, -1.0) * H_eff_psi[i];
     }
