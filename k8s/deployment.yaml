@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pseudomode-framework
+  labels:
+    app: pseudomode-framework
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pseudomode-framework
+  template:
+    metadata:
+      labels:
+        app: pseudomode-framework
+        version: v1.0.0
+    spec:
+      containers:
+      - name: pseudomode-api
+        image: pseudomode-framework:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: USE_GPU
+          value: "false"
+        - name: MAX_PSEUDOMODES
+          value: "6"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/pseudomode
+          readOnly: true
+        - name: cache
+          mountPath: /var/cache/pseudomode
+      volumes:
+      - name: config
+        configMap:
+          name: pseudomode-config
+      - name: cache
+        emptyDir:
+          sizeLimit: 10Gi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - pseudomode-framework
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pseudomode-service
+  labels:
+    app: pseudomode-framework
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: pseudomode-framework
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pseudomode-config
+data:
+  config.json: |
+    {
+      "max_pseudomodes": 6,
+      "adaptive_n_max": 5,
+      "time_step_ps": 0.01,
+      "convergence_tol": 1e-8,
+      "use_gpu": false,
+      "materials": [
+        "graphene",
+        "MoS2",
+        "WS2",
+        "hBN",
+        "WSe2",
+        "MoSe2"
+      ]
+    }

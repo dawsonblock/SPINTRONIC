@@ -1,0 +1,99 @@
+# Doxyfile for Pseudomode Framework
+# Project settings
+PROJECT_NAME           = "2D Pseudomode Framework"
+PROJECT_NUMBER         = @PROJECT_VERSION@
+PROJECT_BRIEF          = "High-performance C++/CUDA framework for quantum pseudomode simulations"
+PROJECT_LOGO           = 
+
+# Output settings
+OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/docs
+CREATE_SUBDIRS         = YES
+ALLOW_UNICODE_NAMES    = YES
+
+# Build configuration
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_ANON_NSPACES   = NO
+
+# Documentation settings
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = NO
+MULTILINE_CPP_IS_BRIEF = NO
+INHERIT_DOCS           = YES
+TAB_SIZE               = 4
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+
+# Input settings
+INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/include \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src \
+                         @CMAKE_CURRENT_SOURCE_DIR@/docs
+FILE_PATTERNS          = *.cpp *.h *.cu *.md
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */build/* */CMakeFiles/*
+
+# Source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+STRIP_CODE_COMMENTS    = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# HTML output
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+HTML_COLORSTYLE_HUE    = 220
+HTML_COLORSTYLE_SAT    = 100
+HTML_COLORSTYLE_GAMMA  = 80
+HTML_TIMESTAMP         = YES
+HTML_DYNAMIC_SECTIONS  = YES
+GENERATE_TREEVIEW      = YES
+
+# LaTeX output
+GENERATE_LATEX         = NO
+
+# Man pages
+GENERATE_MAN           = NO
+
+# Other output formats
+GENERATE_RTF           = NO
+GENERATE_XML           = YES
+
+# Preprocessor settings
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+SEARCH_INCLUDES        = YES
+INCLUDE_PATH           = @CMAKE_CURRENT_SOURCE_DIR@/include
+
+# Graph generation
+HAVE_DOT               = YES
+DOT_NUM_THREADS        = 4
+CLASS_DIAGRAMS         = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+GROUP_GRAPHS           = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+
+# Search engine
+SEARCHENGINE           = YES
+SERVER_BASED_SEARCH    = NO
+
+# External references
+GENERATE_TAGFILE       = @CMAKE_CURRENT_BINARY_DIR@/docs/pseudomode.tag
+ALLEXTERNALS           = NO
+
+# Performance tuning
+NUM_PROC_THREADS       = 0

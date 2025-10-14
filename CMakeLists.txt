@@ -55,22 +55,23 @@ endif()
 
 # Include directories
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${EIGEN3_INCLUDE_DIR}
 )
 
 # Source files
 set(SOURCES
-    spectral_density_2d.cpp
-    prony_fitting.cpp
-    quantum_state.cpp
-    lindblad_evolution.cpp
-    utils.cpp
-    high_level_interface.cpp
+    src/spectral_density_2d.cpp
+    src/prony_fitting.cpp
+    src/quantum_state.cpp
+    src/lindblad_evolution.cpp
+    src/utils.cpp
+    src/high_level_interface.cpp
 )
 
 set(CUDA_SOURCES
-    cuda_kernels.cu
+    src/cuda_kernels.cu
 )
 
 # Create main library
@@ -105,7 +106,7 @@ endif()
 set_target_properties(pseudomode_framework PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION 1
-    PUBLIC_HEADER "pseudomode_solver.h"
+    PUBLIC_HEADER "include/pseudomode_solver.h"
 )
 
 # Install targets
@@ -115,7 +116,7 @@ install(TARGETS pseudomode_framework
 )
 
 # Create command-line executable
-add_executable(pseudomode_cli main.cpp)
+add_executable(pseudomode_cli src/main.cpp)
 target_link_libraries(pseudomode_cli pseudomode_framework)
 
 install(TARGETS pseudomode_cli
@@ -126,7 +127,7 @@ install(TARGETS pseudomode_cli
 if(BUILD_PYTHON_BINDINGS)
     find_package(pybind11 CONFIG)
     if(pybind11_FOUND)
-        pybind11_add_module(pseudomode_py python_bindings.cpp)
+        pybind11_add_module(pseudomode_py src/python_bindings.cpp)
         target_link_libraries(pseudomode_py PRIVATE pseudomode_framework)
 
         # Install Python module
@@ -144,13 +145,13 @@ if(BUILD_TESTS)
     if(GTest_FOUND)
         enable_testing()
 
-        add_executable(test_spectral_density test/test_spectral_density.cpp)
+        add_executable(test_spectral_density tests/test_spectral_density.cpp)
         target_link_libraries(test_spectral_density pseudomode_framework GTest::GTest GTest::Main)
 
-        add_executable(test_prony_fitting test/test_prony_fitting.cpp)
+        add_executable(test_prony_fitting tests/test_prony_fitting.cpp)
         target_link_libraries(test_prony_fitting pseudomode_framework GTest::GTest GTest::Main)
 
-        add_executable(test_quantum_state test/test_quantum_state.cpp)
+        add_executable(test_quantum_state tests/test_quantum_state.cpp)
         target_link_libraries(test_quantum_state pseudomode_framework GTest::GTest GTest::Main)
 
         add_test(NAME SpectralDensityTest COMMAND test_spectral_density)
@@ -163,7 +164,7 @@ endif()
 if(BUILD_BENCHMARKS)
     find_package(benchmark)
     if(benchmark_FOUND)
-        add_executable(benchmark_pseudomode benchmark/benchmark_main.cpp)
+        add_executable(benchmark_pseudomode benchmarks/benchmark_main.cpp)
         target_link_libraries(benchmark_pseudomode pseudomode_framework benchmark::benchmark)
     endif()
 endif()
