@@ -143,11 +143,12 @@ public:
         double temperature_K
     );
     
-    // Custom material JSON import
+    // Custom material JSON import with diagnostics
     static bool load_material_from_json(
         const std::string& json_filename,
         std::string& material_name,
-        std::unordered_map<std::string, double>& params
+        std::unordered_map<std::string, double>& params,
+        std::string* error_message /* out, optional */
     );
     
     static std::vector<double> build_custom_material_spectrum(
