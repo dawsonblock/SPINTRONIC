@@ -38,15 +38,23 @@ spec:
         resources:
           requests:
             memory: "8Gi"
-            cpu: "2000m"
-            nvidia.com/gpu: 1
-          limits:
-            memory: "32Gi"
-            cpu: "8000m"
-            nvidia.com/gpu: 1
-        livenessProbe:
-          httpGet:
-            path: /health
+            # Option A: Remove HPA for GPU workload and fix replicas
+            # spec:
+            #   replicas: 1
+
+            # Or, if keeping HPA, add a clear comment and set min=max=1 to avoid ineffective scaling
+            apiVersion: autoscaling/v2
+            kind: HorizontalPodAutoscaler
+            metadata:
+              name: pseudomode-gpu-hpa
+            spec:
+              scaleTargetRef:
+                apiVersion: apps/v1
+                kind: Deployment
+                name: pseudomode-gpu
+              minReplicas: 1
+              maxReplicas: 1
+              metrics: []
             port: 8080
           initialDelaySeconds: 60
           periodSeconds: 15
