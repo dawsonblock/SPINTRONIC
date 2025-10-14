@@ -10,7 +10,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "../include/pseudomode_solver.h"
+#include <pseudomode_solver.h>
 #include <cmath>
 
 using namespace PseudomodeSolver;
