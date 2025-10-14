@@ -323,18 +323,49 @@ void LindbladSolver::add_commutator(
     }
 }
 
+void LindbladSolver::add_commutator(
+    ComplexVector& result,
+    const ComplexMatrix& H,
+    const ComplexVector& state) const {
+
+    // Effective Hamiltonian for non-Hermitian evolution of a state vector
+    // H_eff = H - (i/2) * Σ_k L_k^† L_k
+    ComplexMatrix H_eff = H;
+
+    for (const auto& L : lindblad_operators_) {
+        ComplexMatrix L_dag_L(total_dim_, std::vector<Complex>(total_dim_, Complex(0.0, 0.0)));
+        // This is inefficient; ideally, pre-calculate L_dag_L products
+        for (int i = 0; i < total_dim_; ++i) {
+            for (int j = 0; j < total_dim_; ++j) {
+                for (int k = 0; k < total_dim_; ++k) {
+                    L_dag_L[i][j] += std::conj(L[k][i]) * L[k][j];
+                }
+            }
+        }
+
+        for (int i = 0; i < total_dim_; ++i) {
+            for (int j = 0; j < total_dim_; ++j) {
+                H_eff[i][j] -= Complex(0.0, 0.5) * L_dag_L[i][j];
+            }
+        }
+    }
+
+    // Evolve with H_eff: d|ψ⟩/dt = -i * H_eff |ψ⟩
+    ComplexVector H_eff_psi = matrix_vector_mult(H_eff, state);
+
+    for (size_t i = 0; i < result.size(); ++i) {
+        result[i] += Complex(0.0, -1.0) * H_eff_psi[i];
+    }
+}
+
+
 void LindbladSolver::add_dissipator(
     ComplexVector& result,
     const ComplexMatrix& L,
     const ComplexVector& state) const {
 
-    // For pure states, dissipator acts as: L|ψ⟩
-    // This is simplified - full implementation would handle density matrices
-    ComplexVector L_psi = matrix_vector_mult(L, state);
-
-    for (size_t i = 0; i < result.size(); ++i) {
-        result[i] += L_psi[i];
-    }
+    // This function is not used for pure state evolution with an effective Hamiltonian.
+    // The dissipative effects are included in the modified add_commutator function.
 }
 
 ComplexVector LindbladSolver::matrix_vector_mult(
