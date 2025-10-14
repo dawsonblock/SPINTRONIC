@@ -106,10 +106,17 @@ __global__ void expectation_value_kernel(
     if (threadIdx.x == 0) {
     // Write result of this block to global memory using separate double buffers
     if (threadIdx.x == 0) {
-        // result_real and result_imag are separate double pointers passed in
-        atomicAdd(result_real, shared_data[0].x);
-        atomicAdd(result_imag, shared_data[0].y);
+    // Write block sum to a global workspace array (one element per block)
+    if (threadIdx.x == 0) {
+        // result_blocks is a preallocated array of size gridDim.x
+        result_blocks[blockIdx.x] = shared_data[0];
     }
+    // After kernel completion, perform final reduction on host:
+    // cuDoubleComplex total = make_cuDoubleComplex(0.0, 0.0);
+    // for (int b = 0; b < numBlocks; ++b) {
+    //     total = cuCadd(total, host_result_blocks[b]);
+    // }
+    // *result = total;
 }
 
 // Adaptive truncation kernel: compute occupation numbers
