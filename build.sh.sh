@@ -121,8 +121,7 @@ configure_build() {
     fi
 
     echo "CMake configuration:"
-    printf '  %s
-' "${CMAKE_ARGS[@]}"
+    printf '  %s\n' "${CMAKE_ARGS[@]}"
     echo
 
     cmake .. "${CMAKE_ARGS[@]}"
