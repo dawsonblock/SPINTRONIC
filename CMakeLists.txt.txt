@@ -1,0 +1,198 @@
+# CMakeLists.txt for 2D Pseudomode Framework C++/CUDA Implementation
+# Apache License 2.0 - Copyright (c) 2025 Aetheron Research
+
+cmake_minimum_required(VERSION 3.18)
+project(pseudomode_framework_cuda VERSION 1.0.0 LANGUAGES CXX CUDA)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find required packages
+find_package(CUDA QUIET)
+find_package(Eigen3 REQUIRED)
+find_package(OpenMP REQUIRED)
+
+# Optional packages
+find_package(PkgConfig)
+pkg_check_modules(HDF5 hdf5)
+
+# Build options
+option(USE_CUDA "Enable CUDA GPU acceleration" ON)
+option(USE_OPENMP "Enable OpenMP parallelization" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_BENCHMARKS "Build performance benchmarks" OFF)
+
+# Compiler flags
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
+
+if(USE_OPENMP)
+    target_link_libraries(pseudomode_framework PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+# CUDA configuration
+if(USE_CUDA AND CUDA_FOUND)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+    # CUDA architecture detection
+    include(FindCUDA/select_compute_arch)
+    CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
+    string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)
+    string(REPLACE " " ";" INSTALLED_GPU_CCS_3 "${INSTALLED_GPU_CCS_2}")
+    string(REPLACE "." "" CUDA_ARCH_LIST "${INSTALLED_GPU_CCS_3}")
+
+    SET(CMAKE_CUDA_ARCHITECTURES "${CUDA_ARCH_LIST}")
+
+    message(STATUS "CUDA detected GPUs: ${INSTALLED_GPU_CCS_3}")
+    message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
+
+    add_definitions(-DUSE_CUDA)
+endif()
+
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${EIGEN3_INCLUDE_DIR}
+)
+
+# Source files
+set(SOURCES
+    spectral_density_2d.cpp
+    prony_fitting.cpp
+    quantum_state.cpp
+    lindblad_evolution.cpp
+    utils.cpp
+    high_level_interface.cpp
+)
+
+set(CUDA_SOURCES
+    cuda_kernels.cu
+)
+
+# Create main library
+add_library(pseudomode_framework SHARED ${SOURCES})
+
+# Link CUDA sources if available
+if(USE_CUDA AND CUDA_FOUND)
+    add_library(pseudomode_framework_cuda SHARED ${CUDA_SOURCES})
+    set_target_properties(pseudomode_framework_cuda PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+    )
+    target_link_libraries(pseudomode_framework PRIVATE pseudomode_framework_cuda)
+    target_link_libraries(pseudomode_framework_cuda PRIVATE cusparse cublas curand)
+endif()
+
+# Link Eigen (header-only)
+target_link_libraries(pseudomode_framework PRIVATE Eigen3::Eigen)
+
+# Link OpenMP
+if(USE_OPENMP)
+    target_link_libraries(pseudomode_framework PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+# Link optional HDF5
+if(HDF5_FOUND)
+    target_include_directories(pseudomode_framework PRIVATE ${HDF5_INCLUDE_DIRS})
+    target_link_libraries(pseudomode_framework PRIVATE ${HDF5_LIBRARIES})
+    add_definitions(-DUSE_HDF5)
+endif()
+
+# Set library properties
+set_target_properties(pseudomode_framework PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION 1
+    PUBLIC_HEADER "pseudomode_solver.h"
+)
+
+# Install targets
+install(TARGETS pseudomode_framework
+    LIBRARY DESTINATION lib
+    PUBLIC_HEADER DESTINATION include
+)
+
+# Create command-line executable
+add_executable(pseudomode_cli main.cpp)
+target_link_libraries(pseudomode_cli pseudomode_framework)
+
+install(TARGETS pseudomode_cli
+    RUNTIME DESTINATION bin
+)
+
+# Python bindings using pybind11
+if(BUILD_PYTHON_BINDINGS)
+    find_package(pybind11 CONFIG)
+    if(pybind11_FOUND)
+        pybind11_add_module(pseudomode_py python_bindings.cpp)
+        target_link_libraries(pseudomode_py PRIVATE pseudomode_framework)
+
+        # Install Python module
+        install(TARGETS pseudomode_py
+            LIBRARY DESTINATION python
+        )
+    else()
+        message(WARNING "pybind11 not found, skipping Python bindings")
+    endif()
+endif()
+
+# Unit tests
+if(BUILD_TESTS)
+    find_package(GTest)
+    if(GTest_FOUND)
+        enable_testing()
+
+        add_executable(test_spectral_density test/test_spectral_density.cpp)
+        target_link_libraries(test_spectral_density pseudomode_framework GTest::GTest GTest::Main)
+
+        add_executable(test_prony_fitting test/test_prony_fitting.cpp)
+        target_link_libraries(test_prony_fitting pseudomode_framework GTest::GTest GTest::Main)
+
+        add_executable(test_quantum_state test/test_quantum_state.cpp)
+        target_link_libraries(test_quantum_state pseudomode_framework GTest::GTest GTest::Main)
+
+        add_test(NAME SpectralDensityTest COMMAND test_spectral_density)
+        add_test(NAME PronyFittingTest COMMAND test_prony_fitting)
+        add_test(NAME QuantumStateTest COMMAND test_quantum_state)
+    endif()
+endif()
+
+# Benchmarks
+if(BUILD_BENCHMARKS)
+    find_package(benchmark)
+    if(benchmark_FOUND)
+        add_executable(benchmark_pseudomode benchmark/benchmark_main.cpp)
+        target_link_libraries(benchmark_pseudomode pseudomode_framework benchmark::benchmark)
+    endif()
+endif()
+
+# Documentation
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+
+    add_custom_target(docs
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
+    )
+endif()
+
+# Package configuration
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    cmake/pseudomode-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/pseudomode-config.cmake
+    INSTALL_DESTINATION lib/cmake/pseudomode
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/pseudomode-config.cmake
+    DESTINATION lib/cmake/pseudomode
+)
