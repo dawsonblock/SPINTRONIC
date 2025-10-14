@@ -176,6 +176,9 @@ PYBIND11_MODULE(pseudomode_py, m) {
     
     m.def("spectral_density", 
           [](const std::vector<double>& omega, const std::string& material, double T) {
+              if (!std::isfinite(T) || T < 0.0) {
+                  throw std::invalid_argument("temperature_K must be a finite, non-negative value");
+              }
               return SpectralDensity2D::build_material_spectrum_T(omega, material, T);
           },
           "Compute temperature-dependent spectral density for a material",
