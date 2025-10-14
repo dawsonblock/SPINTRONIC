@@ -2,16 +2,19 @@
 # Apache License 2.0 - Copyright (c) 2025 Aetheron Research
 
 cmake_minimum_required(VERSION 3.18)
-project(pseudomode_framework_cuda VERSION 1.0.0 LANGUAGES CXX CUDA)
+project(pseudomode_framework_cuda VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find required packages
-find_package(CUDA QUIET)
-find_package(Eigen3 REQUIRED)
-find_package(OpenMP REQUIRED)
+find_package(Eigen3 QUIET)
+find_package(OpenMP QUIET)
+
+# Check for CUDA availability
+include(CheckLanguage)
+check_language(CUDA)
 
 # Optional packages
 find_package(PkgConfig)
@@ -29,32 +32,38 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
 
 # CUDA configuration
-if(USE_CUDA AND CUDA_FOUND)
+if(CMAKE_CUDA_COMPILER AND USE_CUDA)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-    # CUDA architecture detection
-    include(FindCUDA/select_compute_arch)
-    CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
-    string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)
-    string(REPLACE " " ";" INSTALLED_GPU_CCS_3 "${INSTALLED_GPU_CCS_2}")
-    string(REPLACE "." "" CUDA_ARCH_LIST "${INSTALLED_GPU_CCS_3}")
+    # Try to detect CUDA architecture
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 70 75 80 86)  # Common architectures
+    endif()
 
-    SET(CMAKE_CUDA_ARCHITECTURES "${CUDA_ARCH_LIST}")
-
-    message(STATUS "CUDA detected GPUs: ${INSTALLED_GPU_CCS_3}")
+    message(STATUS "CUDA compiler found: ${CMAKE_CUDA_COMPILER}")
     message(STATUS "CUDA architectures: ${CMAKE_CUDA_ARCHITECTURES}")
 
     add_definitions(-DUSE_CUDA)
+    set(CUDA_ENABLED TRUE)
+else()
+    message(STATUS "CUDA not available or disabled, building CPU-only version")
+    set(CUDA_ENABLED FALSE)
 endif()
 
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${EIGEN3_INCLUDE_DIR}
 )
+
+if(Eigen3_FOUND)
+    include_directories(${EIGEN3_INCLUDE_DIR})
+    message(STATUS "Eigen3 found: ${EIGEN3_INCLUDE_DIR}")
+else()
+    message(WARNING "Eigen3 not found - some features will be disabled")
+endif()
 
 # Source files
 set(SOURCES
@@ -74,7 +83,7 @@ set(CUDA_SOURCES
 add_library(pseudomode_framework SHARED ${SOURCES})
 
 # Link CUDA sources if available
-if(USE_CUDA AND CUDA_FOUND)
+if(CUDA_ENABLED)
     add_library(pseudomode_framework_cuda SHARED ${CUDA_SOURCES})
     set_target_properties(pseudomode_framework_cuda PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON
@@ -83,12 +92,17 @@ if(USE_CUDA AND CUDA_FOUND)
     target_link_libraries(pseudomode_framework_cuda PRIVATE cusparse cublas curand)
 endif()
 
-# Link Eigen (header-only)
-target_link_libraries(pseudomode_framework PRIVATE Eigen3::Eigen)
+# Link Eigen (header-only) if found
+if(Eigen3_FOUND)
+    target_link_libraries(pseudomode_framework PRIVATE Eigen3::Eigen)
+endif()
 
-# Link OpenMP if enabled
+# Link OpenMP if enabled and found
 if(USE_OPENMP AND OpenMP_CXX_FOUND)
     target_link_libraries(pseudomode_framework PRIVATE OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP enabled")
+else()
+    message(STATUS "OpenMP not available or disabled")
 endif()
 
 # Link optional HDF5
