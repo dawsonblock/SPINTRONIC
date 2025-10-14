@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Main pseudomode framework service
+  pseudomode:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: pseudomode-framework:latest
+    container_name: pseudomode-main
+    volumes:
+      - ./data:/workspace/data
+      - ./results:/workspace/results
+      - ./examples:/workspace/examples
+    environment:
+      - OMP_NUM_THREADS=4
+      - PYTHONPATH=/opt/pseudomode/lib/python3/site-packages
+    command: >
+      bash -c "
+        echo 'Pseudomode Framework Ready - Docker Compose Environment'
+        tail -f /dev/null
+      "
+    networks:
+      - pseudomode-network
+
+  # Development environment with all tools
+  pseudomode-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: pseudomode-framework:dev
+    container_name: pseudomode-dev
+    volumes:
+      - .:/workspace:cached
+      - pseudomode-build-cache:/workspace/build
+    environment:
+      - OMP_NUM_THREADS=4
+      - PYTHONPATH=/opt/pseudomode/lib/python3/site-packages
+    working_dir: /workspace
+    command: >
+      bash -c "
+        echo 'Development Environment Ready'
+        echo 'Available: cmake, ninja, all dependencies'
+        bash
+      "
+    networks:
+      - pseudomode-network
+    profiles:
+      - dev
+
+  # Jupyter notebook for analysis
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: pseudomode-framework:latest
+    container_name: pseudomode-jupyter
+    volumes:
+      - ./notebooks:/workspace/notebooks
+      - ./data:/workspace/data
+      - ./results:/workspace/results
+    ports:
+      - "8888:8888"
+    environment:
+      - OMP_NUM_THREADS=2
+      - PYTHONPATH=/opt/pseudomode/lib/python3/site-packages
+    command: >
+      bash -c "
+        pip3 install jupyter matplotlib seaborn pandas
+        cd /workspace
+        jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+      "
+    networks:
+      - pseudomode-network
+    profiles:
+      - jupyter
+
+  # MPI-enabled distributed fitting service
+  pseudomode-mpi:
+    build:
+      context: .
+      dockerfile: Dockerfile.mpi
+      target: runtime
+    image: pseudomode-framework:mpi
+    container_name: pseudomode-mpi-master
+    volumes:
+      - ./data:/workspace/data
+      - ./results:/workspace/results
+    environment:
+      - OMPI_ALLOW_RUN_AS_ROOT=1
+      - OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+      - OMP_NUM_THREADS=2
+    command: >
+      bash -c "
+        echo 'MPI-enabled Pseudomode Framework Ready'
+        echo 'Use: mpirun -n 4 pseudomode_fit_mpi <fitpack.json>'
+        tail -f /dev/null
+      "
+    networks:
+      - pseudomode-network
+    profiles:
+      - mpi
+
+volumes:
+  pseudomode-build-cache:
+    driver: local
+
+networks:
+  pseudomode-network:
+    driver: bridge

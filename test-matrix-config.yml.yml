@@ -1,0 +1,67 @@
+# Test matrix configuration for comprehensive coverage
+test_matrix:
+  compilers:
+    - gcc-9
+    - gcc-10
+    - gcc-11
+    - gcc-12
+    - clang-12
+    - clang-13
+    - clang-14
+    - clang-15
+
+    platforms:
+      - Ubuntu 20.04
+      - Ubuntu 22.04
+      - macOS 11
+      - macOS 12
+      - Windows Server 2019
+      - Windows Server 2022
+
+    build_types:
+      - Release
+      - Debug
+      - RelWithDebInfo
+    # Release: optimizations enabled
+    # Debug: full debugging info
+    # RelWithDebInfo: optimized with debug symbols
+
+  feature_combinations:
+    - CUDA + OpenMP + JSON
+    - CPU-only + JSON
+    - Minimal (no optional dependencies)
+
+  memory_testing:
+    - AddressSanitizer (ASan)
+    - UndefinedBehaviorSanitizer (UBSan)
+    - MemorySanitizer (MSan)
+    - ThreadSanitizer (TSan)
+
+  performance_testing:
+    - Benchmarks on Release builds
+    - Memory usage profiling
+    - Cache performance analysis
+    - Scaling tests (1-16 cores)
+
+validation_tests:
+  json_schemas:
+    - Validate all materials files against schema
+    - Validate all fitpack files against v1/v2 schemas
+    - Test schema error handling with invalid files
+
+  physics_validation:
+    - Cross-check C++ vs Python implementations
+    - Validate spectral density exponents (ω^1, ω^3, etc.)
+    - Check KMS detailed balance conditions
+    - Verify temperature scaling laws
+
+  integration_tests:
+    - Full simulation workflows
+    - Parameter fitting convergence
+    - File I/O and data persistence
+    - CLI interface functionality
+
+  regression_tests:
+    - Known good results for reference materials
+    - Performance regression detection
+    - API compatibility checks

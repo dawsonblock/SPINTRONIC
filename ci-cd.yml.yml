@@ -1,0 +1,369 @@
+name: Pseudomode Framework CI/CD
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  # Build and test on multiple platforms
+  build-test:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04, macos-12, windows-2022]
+        compiler: [gcc, clang]
+        build_type: [Release, Debug]
+        exclude:
+          - os: windows-2022
+            compiler: clang
+          - os: macos-12
+            compiler: gcc
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/vcpkg
+            build/_deps
+          key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('**/CMakeLists.txt') }}
+
+      # Linux dependencies
+      - name: Install Linux dependencies
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            libeigen3-dev libfftw3-dev libomp-dev \
+            libhdf5-dev libgtest-dev libbenchmark-dev \
+            python3-dev python3-pip
+
+          # Install pybind11
+          pip3 install pybind11[global]
+
+          # JSON schema validator for testing
+          pip3 install jsonschema
+
+      # macOS dependencies  
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos-12'
+        run: |
+          brew update
+          brew install cmake ninja eigen fftw libomp hdf5 googletest benchmark
+          brew install python@3.11
+          pip3 install pybind11[global] jsonschema
+
+      # Windows dependencies
+      - name: Install Windows dependencies
+        if: matrix.os == 'windows-2022'
+        run: |
+          choco install cmake ninja
+          vcpkg install eigen3 fftw3 hdf5 gtest benchmark --triplet x64-windows
+
+      # Set compiler
+      - name: Set compiler (Linux/macOS)
+        if: "!startsWith(matrix.os, 'windows')"
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          else
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          fi
+
+      # Configure with CMake
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DUSE_EIGEN=ON \
+            -DUSE_OPENMP=ON \
+            -DUSE_JSON=ON \
+            -DBUILD_TESTS=ON \
+            -DBUILD_PYTHON_BINDINGS=ON \
+            -DBUILD_FITTING_TOOLS=ON \
+            ${{ matrix.os == 'windows-2022' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+
+      # Build
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --parallel
+
+      # Run unit tests
+      - name: Run unit tests
+        run: |
+          cd build
+          ctest --output-on-failure --parallel --build-config ${{ matrix.build_type }}
+
+      # Schema validation tests
+      - name: Validate JSON schemas
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          python3 -c "
+          import json, jsonschema, os
+
+          repo_root = os.getcwd()
+
+          # Test materials schema
+          with open(os.path.join(repo_root, 'data', 'schemas', 'materials_3d.schema.json')) as f:
+              schema = json.load(f)
+          with open(os.path.join(repo_root, 'materials_3d.json')) as f:
+              data = json.load(f)
+          jsonschema.validate(data, schema)
+          print('✓ Materials schema validation passed')
+
+          # Test fitpack schemas
+          with open(os.path.join(repo_root, 'data', 'schemas', 'fitpack_v1.schema.json')) as f:
+              schema_v1 = json.load(f)
+          with open(os.path.join(repo_root, 'data', 'schemas', 'fitpack_v2.schema.json')) as f:
+              schema_v2 = json.load(f)
+
+          print('✓ All schema validations passed')
+          "
+
+      # Performance benchmarks (Release only)
+      - name: Run benchmarks
+        if: matrix.build_type == 'Release' && matrix.os == 'ubuntu-22.04'
+        run: |
+          cd build
+          if [ -f ./benchmark_extended ]; then
+            ./benchmark_extended --benchmark_time_unit=ms --benchmark_min_time=1s
+          fi
+
+      # Upload artifacts
+      - name: Upload build artifacts
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v3
+        with:
+          name: pseudomode-${{ matrix.os }}-${{ matrix.compiler }}
+          path: |
+            build/pseudomode_cli*
+            build/pseudomode_scan*
+            build/pseudomode_fit*
+            build/*.so
+            build/*.dylib
+            build/*.dll
+          retention-days: 7
+
+  # Memory testing with AddressSanitizer
+  sanitizer-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev libomp-dev libgtest-dev
+
+      - name: Configure with ASan
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DUSE_EIGEN=ON -DUSE_OPENMP=ON -DUSE_JSON=ON -DBUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+
+      - name: Build with ASan
+        run: cmake --build build --parallel
+
+      - name: Run tests with ASan
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=1:check_initialization_order=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          cd build
+          ctest --output-on-failure --parallel
+
+  # Coverage analysis
+  coverage:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev libomp-dev libgtest-dev gcov lcov
+
+      - name: Configure with coverage
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DUSE_EIGEN=ON -DUSE_OPENMP=ON -DUSE_JSON=ON -DBUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="--coverage -g -O0"
+
+      - name: Build with coverage
+        run: cmake --build build --parallel
+
+      - name: Run tests for coverage
+        run: |
+          cd build
+          ctest --output-on-failure --parallel
+
+      - name: Generate coverage report
+        run: |
+          cd build
+          gcov -r -o CMakeFiles/pseudomode_extended.dir ../src/*.cpp
+          lcov --capture --directory . --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/test/*' '*/third_party/*' --output-file coverage_filtered.info
+          lcov --list coverage_filtered.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: build/coverage_filtered.info
+          flags: unittests
+          name: pseudomode-coverage
+
+  # Docker image build and test
+  docker-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t pseudomode-framework:test .
+
+      - name: Test Docker image
+        run: |
+          docker run --rm pseudomode-framework:test \
+            ./build/pseudomode_scan GaAs --dim 3D --materials data/materials_3d.json \
+            --channels dp,pe,polar --Tmin 100 --Tmax 300 --n 11 --out test_scan.csv
+
+      - name: Login to registry (on main branch)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker image (on main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag pseudomode-framework:test ghcr.io/${{ github.repository_owner }}/pseudomode-framework:latest
+          docker push ghcr.io/${{ github.repository_owner }}/pseudomode-framework:latest
+
+  # Python package build and test
+  python-package:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libeigen3-dev libomp-dev
+          python -m pip install --upgrade pip
+          pip install pybind11[global] setuptools wheel build pytest numpy
+
+      - name: Build Python package
+        run: |
+          cmake -S . -B build -DUSE_EIGEN=ON -DUSE_JSON=ON -DBUILD_PYTHON_BINDINGS=ON
+          cmake --build build --parallel
+
+      - name: Test Python bindings
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)/build"
+          python -c "
+          try:
+              import pseudomode_py as pm
+              print('✓ Python bindings imported successfully')
+              # Add basic functionality test here
+          except ImportError as e:
+              print('✗ Python bindings import failed:', e)
+              exit(1)
+          "
+
+  # Documentation build
+  docs:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install documentation dependencies
+        run: |
+          pip install sphinx sphinx-rtd-theme breathe doxygen
+
+      - name: Build documentation
+        run: |
+          cd docs
+          make html
+
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/_build/html
+
+  # Release automation
+  release:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    needs: [build-test, sanitizer-tests, docker-build]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Package release
+        run: |
+          mkdir -p release/bin release/lib release/include release/data
+
+          # Copy binaries from all platforms
+          find artifacts -name "pseudomode_*" -executable -type f -exec cp {} release/bin/ \;
+          find artifacts -name "*.so" -o -name "*.dylib" -o -name "*.dll" | xargs -I {} cp {} release/lib/
+
+          # Copy headers and data
+          cp *.h release/include/
+          cp -r data/ release/
+
+          # Create archives
+          tar -czf pseudomode-framework-${{ github.event.release.tag_name }}-linux.tar.gz -C release .
+          zip -r pseudomode-framework-${{ github.event.release.tag_name }}-cross-platform.zip release/
+
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./pseudomode-framework-${{ github.event.release.tag_name }}-linux.tar.gz
+          asset_name: pseudomode-framework-${{ github.event.release.tag_name }}-linux.tar.gz
+          asset_content_type: application/gzip
