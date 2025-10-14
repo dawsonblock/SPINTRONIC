@@ -285,7 +285,11 @@ Build-ubuntu-cpu:
         run: |
           mkdir -p build
           cd build
-          doxygen ../docs/Doxyfile || echo "Doxygen config needs creation"
+          if [ ! -f ../docs/Doxyfile ]; then
+            echo "Error: Doxyfile not found at ../docs/Doxyfile"
+            exit 1
+          fi
+          doxygen ../docs/Doxyfile
       
       - name: Upload documentation
         uses: actions/upload-artifact@v3
