@@ -606,12 +606,7 @@ bool SpectralDensity2D::load_material_from_json(
         // Ensure remaining chars are only whitespace
         while (ok && *endptr != '\0') {
             if (!std::isspace(static_cast<unsigned char>(*endptr))) { ok = false; break; }
-            ++endptr;
-        }
-        if (!ok) {
-            // Malformed numeric; abort to prevent corrupt params
-            return false;
-        }
+        return !material_name.empty();
         params[key] = value;
     }
 
