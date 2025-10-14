@@ -309,10 +309,14 @@ int main() {
 
     // Create grids
     std::vector<double> omega_grid, time_grid;
-    for (double w = 0.001; w <= 0.2; w += 0.0001) 
-        omega_grid.push_back(w);
-    for (double t = 0; t <= 100; t += 0.01) 
-        time_grid.push_back(t);
+    const int omega_points = 2000;
+    for (int i = 0; i < omega_points; ++i) {
+        omega_grid.push_back(0.001 + i * (0.2 - 0.001) / (omega_points - 1));
+    }
+    const int time_points = 500;
+    for (int i = 0; i < time_points; ++i) {
+        time_grid.push_back(0.0 + i * (100.0 - 0.0) / (time_points - 1));
+    }
 
     // Simulate
     auto result = framework.simulate_material(
