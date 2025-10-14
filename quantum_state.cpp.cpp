@@ -13,7 +13,30 @@ namespace PseudomodeSolver {
 QuantumState::QuantumState(int system_dim, int n_pseudomodes, int n_max)
     : sys_dim_(system_dim), n_modes_(n_pseudomodes), n_max_(n_max) {
 
-    total_dim_ = sys_dim_ * std::pow(n_max_, n_modes_);
+    auto int_pow = [](int base, int exp) -> int {
+        if (base <= 0 || exp < 0) return 0;
+        int result = 1;
+        while (exp > 0) {
+            if (exp & 1) {
+                if (result > std::numeric_limits<int>::max() / base) {
+                    throw std::overflow_error("Dimension overflow in quantum state size computation");
+                }
+                result *= base;
+            }
+            if (exp > 1) {
+                if (base > 0 && base > std::numeric_limits<int>::max() / base) {
+                    throw std::overflow_error("Dimension overflow in quantum state size computation");
+                }
+                base *= base;
+            }
+            exp >>= 1;
+        }
+        return result;
+    };
+    total_dim_ = sys_dim_ * int_pow(n_max_, n_modes_);
+    if (total_dim_ <= 0) {
+        throw std::overflow_error("Computed total_dim_ is invalid");
+    }
     state_vector_.resize(total_dim_, Complex(0.0, 0.0));
 
 #ifdef USE_CUDA
