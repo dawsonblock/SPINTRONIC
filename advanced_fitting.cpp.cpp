@@ -86,26 +86,46 @@ EnhancedFitResult AdvancedFitter::fit() {
         // Define objective function with gradient
         auto objective_with_grad = [this](const std::vector<double>& optimizer_params, 
                                         std::vector<double>& grad) -> double {
-            const double eps = 1e-5;
+            // Adaptive epsilon per-dimension
+            const double base_eps = 1e-6;
 
-            // Convert to physical space
-            auto physical_params = optimizer_to_physical(optimizer_params);
+            auto eval_obj_from_opt = [this](const std::vector<double>& opt)->double {
+                auto phys = optimizer_to_physical(opt);
+                return compute_simulation_loss(phys) + compute_regularization_loss(phys);
+            };
 
-            // Compute function value
-            double f = compute_simulation_loss(physical_params) + 
-                      compute_regularization_loss(physical_params);
+            // Compute function value at current point
+            double f = eval_obj_from_opt(optimizer_params);
 
-            // Compute gradient by finite differences
-            grad.resize(optimizer_params.size());
-            for (size_t i = 0; i < optimizer_params.size(); ++i) {
-                auto params_plus = optimizer_params;
-                params_plus[i] += eps;
+            // Central difference gradient in optimizer space
+            const size_t n = optimizer_params.size();
+            grad.assign(n, 0.0);
 
-                auto physical_plus = optimizer_to_physical(params_plus);
-                double f_plus = compute_simulation_loss(physical_plus) + 
-                               compute_regularization_loss(physical_plus);
+            for (size_t i = 0; i < n; ++i) {
+                double xi = optimizer_params[i];
+                double eps = base_eps * std::max(1.0, std::abs(xi));
 
-                grad[i] = (f_plus - f) / eps;
+                std::vector<double> x_plus = optimizer_params;
+                std::vector<double> x_minus = optimizer_params;
+                x_plus[i]  = xi + eps;
+                x_minus[i] = xi - eps;
+
+                double f_plus  = eval_obj_from_opt(x_plus);
+                double f_minus = eval_obj_from_opt(x_minus);
+
+                // If numerical issues, fallback to forward diff
+                if (!std::isfinite(f_plus) || !std::isfinite(f_minus)) {
+                    std::vector<double> x_fwd = optimizer_params;
+                    x_fwd[i] = xi + eps;
+                    double f_fwd = eval_obj_from_opt(x_fwd);
+                    if (std::isfinite(f_fwd)) {
+                        grad[i] = (f_fwd - f) / eps;
+                    } else {
+                        grad[i] = 0.0; // fallback safe guard; optimizer will adjust
+                    }
+                } else {
+                    grad[i] = (f_plus - f_minus) / (2.0 * eps);
+                }
             }
 
             return f;
