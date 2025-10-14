@@ -5,7 +5,7 @@
 
 #ifdef USE_CUDA
 
-#include "pseudomode_solver.h"
+#include "../include/pseudomode_solver.h"
 #include <cuda_runtime.h>
 #include <cuComplex.h>
 #include <device_launch_parameters.h>

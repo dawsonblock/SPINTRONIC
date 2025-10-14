@@ -28,10 +28,6 @@ option(BUILD_BENCHMARKS "Build performance benchmarks" OFF)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
 
-if(USE_OPENMP)
-    target_link_libraries(pseudomode_framework PRIVATE OpenMP::OpenMP_CXX)
-endif()
-
 # CUDA configuration
 if(USE_CUDA AND CUDA_FOUND)
     enable_language(CUDA)
@@ -90,8 +86,8 @@ endif()
 # Link Eigen (header-only)
 target_link_libraries(pseudomode_framework PRIVATE Eigen3::Eigen)
 
-# Link OpenMP
-if(USE_OPENMP)
+# Link OpenMP if enabled
+if(USE_OPENMP AND OpenMP_CXX_FOUND)
     target_link_libraries(pseudomode_framework PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
