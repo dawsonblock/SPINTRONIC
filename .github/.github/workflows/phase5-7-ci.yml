@@ -113,19 +113,6 @@ Build-ubuntu-cpu:
             -DUSE_CUDA=ON \
             -DCMAKE_CUDA_COMPILER="$CUDACXX"
           cmake --build build --parallel $(nproc)
-    
-          - name: Build with CUDA
-            if: steps.cuda-setup.outputs.cuda_available == 'true'
-            env:
-              CUDACXX: ${{ env.CUDACXX }}
-            run: |
-              echo "Using nvcc at: $CUDACXX"
-              cmake -B build \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DUSE_CUDA=ON \
-                -DCMAKE_CUDA_COMPILER="$CUDACXX"
-              cmake --build build --parallel $(nproc)
-                libomp-dev libgtest-dev
 
           - name: Install Eigen3
             if: steps.cuda-check.outputs.cuda_available == 'true'
