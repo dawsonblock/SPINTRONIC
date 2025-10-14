@@ -159,54 +159,51 @@ double LBFGSBOptimizer::line_search(
 
     const double c1 = options_.c1;
     const double c2 = options_.c2;
-    const double rho = 0.5;  // Step reduction factor
+    const double rho = 0.5;
     const int max_line_search = 20;
 
     double step = initial_step;
-    double f0 = 0.0;  // Will be set by first objective call
-    std::vector<double> grad0(x.size());
 
-    // Compute initial directional derivative
+    // Baseline function value and directional derivative
+    double f0 = 0.0;
+    std::vector<double> grad0 = gradient; // use provided gradient
+    f0 = objective(x, grad0);             // ensure f0 consistent with grad0
+
     double derphi0 = std::inner_product(
-        gradient.begin(), gradient.end(), direction.begin(), 0.0
+        grad0.begin(), grad0.end(), direction.begin(), 0.0
     );
-
-    if (derphi0 >= 0) {
-        return 0.0; // Not a descent direction
+    if (derphi0 >= 0.0) {
+        return 0.0;
     }
 
-    // Try steps until Armijo condition is satisfied
     for (int i = 0; i < max_line_search; ++i) {
         std::vector<double> x_new = x;
-
-        // Take step and project
         for (size_t j = 0; j < x.size(); ++j) {
             x_new[j] += step * direction[j];
         }
         project_bounds(x_new, lower_bounds, upper_bounds);
 
-        // Evaluate at new point
         std::vector<double> grad_new(x.size());
         double f_new = objective(x_new, grad_new);
 
-        if (i == 0) {
-            f0 = objective(x, grad0); // Get baseline value
-        }
-
-        // Check Armijo condition
+        // Armijo condition
         if (f_new <= f0 + c1 * step * derphi0) {
-            return step;
+            // Strong Wolfe curvature condition
+            double derphi = std::inner_product(
+                grad_new.begin(), grad_new.end(), direction.begin(), 0.0
+            );
+            if (std::abs(derphi) <= c2 * std::abs(derphi0)) {
+                return step;
+            }
         }
 
-        // Reduce step size
         step *= rho;
-
-        if (step < 1e-10) {
-            break;
+        if (step < 1e-12) {
+            return 0.0; // indicate failure
         }
     }
 
-    return step; // Return last attempted step
+    return 0.0; // indicate failure after max iterations
 }
 
 void LBFGSBOptimizer::compute_search_direction(
