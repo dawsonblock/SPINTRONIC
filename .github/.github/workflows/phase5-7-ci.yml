@@ -127,18 +127,13 @@ Build-ubuntu-cpu:
       
       - name: Install Eigen3
         run: |
-          wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
-          tar xzf eigen-3.4.0.tar.gz
-          cd eigen-3.4.0
-          mkdir build && cd build
-          cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/eigen3_install
-          make install
+          sudo apt-get update
+          sudo apt-get install -y libeigen3-dev
       
       - name: Build Python bindings
         run: |
           cmake -B build \
-            -DBUILD_PYTHON_BINDINGS=ON \
-            -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
+            -DBUILD_PYTHON_BINDINGS=ON
           cmake --build build --target pseudomode_py --parallel $(nproc)
       
       - name: Test Python import
