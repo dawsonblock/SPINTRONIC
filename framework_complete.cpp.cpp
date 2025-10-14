@@ -24,7 +24,7 @@ PseudomodeFramework::PseudomodeFramework(const SimulationConfig& config)
 
     std::cout << "Initialized 2D Pseudomode Framework" << std::endl;
     std::cout << "  Max modes: " << config_.max_modes << std::endl;
-    std::cout << "  n_max: " << config_.total_time_ps << " ps" << std::endl;
+    std::cout << "  n_max: " << static_cast<int>(config_.total_time_ps / config_.time_step_ps) << std::endl;
     std::cout << "  GPU: " << (config_.use_gpu ? "enabled" : "disabled") << std::endl;
 
 #ifdef USE_OPENMP
