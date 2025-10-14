@@ -4,10 +4,32 @@
  */
 
 #include "pseudomode_solver.h"
-#include <fftw3.h>
 #include <chrono>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
+
+// Simple DFT implementation (no FFTW dependency)
+namespace {
+    void simple_dft(const std::vector<std::complex<double>>& input,
+                   std::vector<std::complex<double>>& output,
+                   bool inverse = false) {
+        const int N = input.size();
+        output.resize(N);
+        const double sign = inverse ? 1.0 : -1.0;
+        
+        for (int k = 0; k < N; ++k) {
+            output[k] = std::complex<double>(0.0, 0.0);
+            for (int n = 0; n < N; ++n) {
+                double angle = sign * 2.0 * M_PI * k * n / N;
+                output[k] += input[n] * std::exp(std::complex<double>(0.0, angle));
+            }
+            if (inverse) {
+                output[k] /= N;
+            }
+        }
+    }
+}
 
 namespace PseudomodeSolver {
 
@@ -20,31 +42,31 @@ void fft_spectrum_to_correlation(
     const int N = J_omega.size();
     correlation.resize(N);
 
-    // Allocate FFTW arrays
-    fftw_complex* in = fftw_alloc_complex(N);
-    fftw_complex* out = fftw_alloc_complex(N);
-
-    // Create FFTW plan
-    fftw_plan plan = fftw_plan_dft_1d(N, in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
-
-    // Fill input array (spectral density is real)
+    // Convert real spectral density to complex array
+    std::vector<Complex> input(N);
     for (int i = 0; i < N; ++i) {
-        in[i][0] = J_omega[i]; // Real part
-        in[i][1] = 0.0;        // Imaginary part
+        input[i] = Complex(J_omega[i], 0.0);
     }
-
-    // Execute FFT
-    fftw_execute(plan);
-
-    // Extract correlation function
-    for (int i = 0; i < N; ++i) {
-        correlation[i] = Complex(out[i][0], out[i][1]);
-    }
-
-    // Cleanup
-    fftw_destroy_plan(plan);
-    fftw_free(in);
-    fftw_free(out);
+    
+    // Perform inverse DFT
+    simple_dft(input, correlation, true);
+    
+    // OLD FFTW code (commented out - no FFTW dependency)
+    // fftw_complex* in = fftw_alloc_complex(N);
+    // fftw_complex* out = fftw_alloc_complex(N);
+    // fftw_plan plan = fftw_plan_dft_1d(N, in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
+    // OLD FFTW code (replaced with simple_dft)
+    // for (int i = 0; i < N; ++i) {
+    //     in[i][0] = J_omega[i];
+    //     in[i][1] = 0.0;
+    // }
+    // fftw_execute(plan);
+    // for (int i = 0; i < N; ++i) {
+    //     correlation[i] = Complex(out[i][0], out[i][1]);
+    // }
+    // fftw_destroy_plan(plan);
+    // fftw_free(in);
+    // fftw_free(out);
 }
 
 int compute_adaptive_n_max(

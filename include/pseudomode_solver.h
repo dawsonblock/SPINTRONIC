@@ -409,6 +409,11 @@ namespace Utils {
         const std::vector<Complex>& correlation,
         std::vector<Complex>& spectrum
     );
+    
+    void fft_spectrum_to_correlation(
+        const std::vector<double>& J_omega,
+        std::vector<Complex>& correlation
+    );
 
     // Adaptive truncation based on occupation numbers
     int compute_adaptive_n_max(
