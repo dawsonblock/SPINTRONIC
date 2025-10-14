@@ -70,13 +70,24 @@ int compute_adaptive_n_max(
     return std::min(max_n_max, 15);
 }
 
+// Efficient integer exponentiation
+static int int_pow(int base, int exp) {
+    int result = 1;
+    while (exp > 0) {
+        if (exp % 2 == 1) result *= base;
+        base *= base;
+        exp /= 2;
+    }
+    return result;
+}
+
 size_t estimate_memory_usage(
     int system_dim,
     int n_pseudomodes,
     int n_max) {
 
     // State vector size
-    int total_dim = system_dim * std::pow(n_max, n_pseudomodes);
+    int total_dim = system_dim * int_pow(n_max, n_pseudomodes);
     size_t state_memory = total_dim * sizeof(std::complex<double>);
 
     // Sparse matrices (rough estimate)
