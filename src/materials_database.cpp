@@ -538,11 +538,6 @@ std::vector<double> SpectralDensity2D::build_material_spectrum_T(
             J_total[i] += J_opt_sum[i];
         }
     }
-
-    #pragma omp parallel for
-    for (size_t i = 0; i < omega.size(); ++i) {
-        J_total[i] += J_opt_sum[i];
-    }
     
     return J_total;
 }
