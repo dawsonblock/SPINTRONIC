@@ -112,18 +112,20 @@ jobs:
           python3 -c "
           import json, jsonschema, os
 
+          repo_root = os.getcwd()
+
           # Test materials schema
-          with open('data/schemas/materials_3d.schema.json') as f:
+          with open(os.path.join(repo_root, 'data', 'schemas', 'materials_3d.schema.json')) as f:
               schema = json.load(f)
-          with open('materials_3d.json') as f:
+          with open(os.path.join(repo_root, 'materials_3d.json')) as f:
               data = json.load(f)
           jsonschema.validate(data, schema)
           print('✓ Materials schema validation passed')
 
           # Test fitpack schemas
-          with open('data/schemas/fitpack_v1.schema.json') as f:
+          with open(os.path.join(repo_root, 'data', 'schemas', 'fitpack_v1.schema.json')) as f:
               schema_v1 = json.load(f)
-          with open('data/schemas/fitpack_v2.schema.json') as f:
+          with open(os.path.join(repo_root, 'data', 'schemas', 'fitpack_v2.schema.json')) as f:
               schema_v2 = json.load(f)
 
           print('✓ All schema validations passed')
