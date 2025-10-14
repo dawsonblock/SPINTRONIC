@@ -451,4 +451,30 @@ double LindbladEvolution::extract_gaussian_decay_time(
     return (slope < 0.0) ? 1000.0 * std::sqrt(-1.0 / slope) : 0.0;
 }
 
+void LindbladEvolution::sparse_matrix_vector_mult(
+    const SparseMatrix& A,
+    const ComplexVector& x,
+    ComplexVector& y) const {
+    // Sparse matrix-vector multiplication: y = A * x
+    // CSR (Compressed Sparse Row) format
+    
+    const int n_rows = A.rows;
+    y.resize(n_rows);
+    std::fill(y.begin(), y.end(), Complex(0.0, 0.0));
+    
+    #pragma omp parallel for
+    for (int i = 0; i < n_rows; ++i) {
+        Complex sum(0.0, 0.0);
+        const int row_start = A.row_ptrs[i];
+        const int row_end = A.row_ptrs[i + 1];
+        
+        for (int idx = row_start; idx < row_end; ++idx) {
+            int j = A.col_indices[idx];
+            sum += A.values[idx] * x[j];
+        }
+        
+        y[i] = sum;
+    }
+}
+
 } // namespace PseudomodeSolver

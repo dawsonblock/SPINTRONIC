@@ -8,7 +8,8 @@
 #include <thread>
 #include <future>
 #include <fstream>
-#include <json/json.h>
+#include <iostream>
+// #include <json/json.h>  // Optional - disable for now
 
 namespace PseudomodeSolver {
 
@@ -42,9 +43,9 @@ PseudomodeFramework2D::SimulationResult PseudomodeFramework2D::simulate_material
         // Generate material spectral density
         auto J_omega = SpectralDensity2D::build_material_spectrum(omega_grid, material_name);
 
-        // Compute correlation function via FFT
+        // Convert to correlation function via inverse FFT
         std::vector<Complex> C_data(time_grid.size());
-        Utils::fft_correlation_to_spectrum(C_data, J_omega);
+        Utils::fft_spectrum_to_correlation(J_omega, C_data);
 
         std::cout << "Step 2: Fitting pseudomode decomposition" << std::endl;
 
@@ -164,37 +165,35 @@ void PseudomodeFramework2D::export_results(
     const std::string& format) {
 
     if (format == "json") {
-        Json::Value root;
-
-        // Basic information
-        root["status"] = result.status;
-        root["computation_time_seconds"] = result.computation_time_seconds;
-        root["framework_version"] = "1.0.0-cpp";
-        root["timestamp"] = std::time(nullptr);
-
-        // Fitted modes
-        Json::Value modes_json(Json::arrayValue);
-        for (size_t k = 0; k < result.fitted_modes.size(); ++k) {
-            Json::Value mode;
-            mode["mode_id"] = static_cast<int>(k + 1);
-            mode["omega_eV"] = result.fitted_modes[k].omega_eV;
-            mode["gamma_eV"] = result.fitted_modes[k].gamma_eV;
-            mode["g_eV"] = result.fitted_modes[k].g_eV;
-            mode["mode_type"] = result.fitted_modes[k].mode_type;
-            modes_json.append(mode);
-        }
-        root["pseudomodes"] = modes_json;
-
-        // Coherence times
-        Json::Value coherence;
-        coherence["T1_ps"] = result.coherence_times.T1_ps;
-        coherence["T2_star_ps"] = result.coherence_times.T2_star_ps;
-        coherence["T2_echo_ps"] = result.coherence_times.T2_echo_ps;
-        root["coherence_times"] = coherence;
-
-        // Write to file
-        std::ofstream file(filename);
-        file << root;
+        // JSON export disabled (requires jsoncpp library)
+        std::cerr << "JSON export not available in this build. Use CSV format instead." << std::endl;
+        return;
+        
+        // #ifdef USE_JSON
+        // Json::Value root;
+        // root["status"] = result.status;
+        // root["computation_time_seconds"] = result.computation_time_seconds;
+        // root["framework_version"] = "1.0.0-cpp";
+        // root["timestamp"] = std::time(nullptr);
+        // Json::Value modes_json(Json::arrayValue);
+        // for (size_t k = 0; k < result.fitted_modes.size(); ++k) {
+        //     Json::Value mode;
+        //     mode["mode_id"] = static_cast<int>(k + 1);
+        //     mode["omega_eV"] = result.fitted_modes[k].omega_eV;
+        //     mode["gamma_eV"] = result.fitted_modes[k].gamma_eV;
+        //     mode["g_eV"] = result.fitted_modes[k].g_eV;
+        //     mode["mode_type"] = result.fitted_modes[k].mode_type;
+        //     modes_json.append(mode);
+        // }
+        // root["pseudomodes"] = modes_json;
+        // Json::Value coherence;
+        // coherence["T1_ps"] = result.coherence_times.T1_ps;
+        // coherence["T2_star_ps"] = result.coherence_times.T2_star_ps;
+        // coherence["T2_echo_ps"] = result.coherence_times.T2_echo_ps;
+        // root["coherence_times"] = coherence;
+        // std::ofstream file(filename);
+        // file << root;
+        // #endif
 
     } else if (format == "csv") {
         std::ofstream file(filename);

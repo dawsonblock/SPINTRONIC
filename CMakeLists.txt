@@ -82,6 +82,12 @@ set(CUDA_SOURCES
 # Create main library
 add_library(pseudomode_framework SHARED ${SOURCES})
 
+# Special compilation flags for slow-compiling files
+# Disable all optimizations and reduce Eigen template depth
+set_source_files_properties(src/prony_fitting.cpp PROPERTIES 
+    COMPILE_FLAGS "-O0 -g0 -ftemplate-depth=128 -fno-var-tracking"
+)
+
 # Link CUDA sources if available
 if(CUDA_ENABLED)
     add_library(pseudomode_framework_cuda SHARED ${CUDA_SOURCES})
