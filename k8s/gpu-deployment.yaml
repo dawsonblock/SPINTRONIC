@@ -30,14 +30,11 @@ spec:
         env:
         - name: USE_GPU
           value: "true"
-        - name: GPU_DEVICE_ID
-          value: "0"
         - name: MAX_PSEUDOMODES
           value: "10"
         - name: LOG_LEVEL
           value: "INFO"
-        # The 'CUDA_VISIBLE_DEVICES' environment variable should be removed.
-        # The NVIDIA device plugin will automatically set 'NVIDIA_VISIBLE_DEVICES'.
+        # Rely on NVIDIA device plugin to set NVIDIA_VISIBLE_DEVICES; do not hard-code GPU indices.
         resources:
           requests:
             memory: "8Gi"
