@@ -83,20 +83,19 @@ Build-ubuntu-cpu:
       - name: Check and install CUDA toolkit
         id: cuda
         run: |
-          set -e
           if command -v nvcc > /dev/null 2>&1; then
-            echo "cuda_available=true" >> $GITHUB_OUTPUT
-            echo "CUDACXX=$(command -v nvcc)" >> $GITHUB_ENV
+            echo "cuda_available=true" >> "$GITHUB_OUTPUT"
+            echo "CUDACXX=$(command -v nvcc)" >> "$GITHUB_ENV"
             exit 0
           fi
-          sudo apt-get update
-          sudo apt-get install -y nvidia-cuda-toolkit
-          if command -v nvcc > /dev/null 2>&1; then
-            echo "cuda_available=true" >> $GITHUB_OUTPUT
-            echo "CUDACXX=$(command -v nvcc)" >> $GITHUB_ENV
-          else
-            echo "cuda_available=false" >> $GITHUB_OUTPUT
+          if sudo apt-get update && sudo apt-get install -y nvidia-cuda-toolkit; then
+            if command -v nvcc > /dev/null 2>&1; then
+              echo "cuda_available=true" >> "$GITHUB_OUTPUT"
+              echo "CUDACXX=$(command -v nvcc)" >> "$GITHUB_ENV"
+              exit 0
+            fi
           fi
+          echo "cuda_available=false" >> "$GITHUB_OUTPUT"
 
       - name: Skip if CUDA not available
         if: steps.cuda.outputs.cuda_available == 'false'
