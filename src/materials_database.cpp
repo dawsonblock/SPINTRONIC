@@ -537,65 +537,76 @@ std::vector<double> SpectralDensity2D::build_material_spectrum_T(
     
     return J_total;
 }
-
-// ============================================================================
-// Custom material JSON import
-// ============================================================================
-
-// Simple JSON parser (no external dependencies)
+// Simple JSON parser (no external dependencies) — improved numeric parsing and validation
 bool SpectralDensity2D::load_material_from_json(
     const std::string& json_filename,
     std::string& material_name,
     std::unordered_map<std::string, double>& params) {
-    
+
     std::ifstream file(json_filename);
     if (!file.is_open()) {
         return false;
     }
-    
+
     params.clear();
+    material_name.clear();
     std::string line;
-    bool in_params = false;
-    
+
     while (std::getline(file, line)) {
         // Remove whitespace
         line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
-        
-        if (line.empty() || line[0] == '#') continue;  // Comments
-        
+        if (line.empty() || line[0] == '#') continue;
+
         // Parse "material_name": "value"
         if (line.find("\"material_name\"") != std::string::npos) {
-            size_t start = line.find(':') + 1;
-            size_t quote1 = line.find('"', start);
-            size_t quote2 = line.find('"', quote1 + 1);
-            if (quote1 != std::string::npos && quote2 != std::string::npos) {
-                material_name = line.substr(quote1 + 1, quote2 - quote1 - 1);
+            size_t start = line.find(':');
+            if (start != std::string::npos) {
+                size_t quote1 = line.find('"', start + 1);
+                size_t quote2 = (quote1 != std::string::npos) ? line.find('"', quote1 + 1) : std::string::npos;
+                if (quote1 != std::string::npos && quote2 != std::string::npos) {
+                    material_name = line.substr(quote1 + 1, quote2 - quote1 - 1);
+                }
             }
+            continue;
         }
-        
+
         // Parse "key": value
         size_t colon = line.find(':');
-        if (colon != std::string::npos) {
-            size_t quote1 = line.find('"');
-            size_t quote2 = line.find('"', quote1 + 1);
-            if (quote1 != std::string::npos && quote2 != std::string::npos && quote2 < colon) {
-                std::string key = line.substr(quote1 + 1, quote2 - quote1 - 1);
-                
-                // Extract numeric value
-                std::string value_str = line.substr(colon + 1);
-                // Remove trailing comma and brackets
-                value_str.erase(std::remove(value_str.begin(), value_str.end(), ','), value_str.end());
-                value_str.erase(std::remove(value_str.begin(), value_str.end(), '}'), value_str.end());
-                value_str.erase(std::remove(value_str.begin(), value_str.end(), ']'), value_str.end());
-                
-                if (key != "material_name") {
-                    try {
-                        double value = std::stod(value_str);
-                        params[key] = value;
-                    } catch (...) {
-                        // Skip non-numeric values
-                    }
-                }
+        if (colon == std::string::npos) continue;
+
+        size_t quote1 = line.find('"');
+        size_t quote2 = (quote1 != std::string::npos) ? line.find('"', quote1 + 1) : std::string::npos;
+        if (quote1 == std::string::npos || quote2 == std::string::npos || quote2 >= colon) continue;
+
+        std::string key = line.substr(quote1 + 1, quote2 - quote1 - 1);
+        if (key == "material_name") continue;
+
+        // Extract numeric value substring
+        std::string value_str = line.substr(colon + 1);
+        // Strip trailing commas/brackets/braces
+        value_str.erase(std::remove(value_str.begin(), value_str.end(), ','), value_str.end());
+        value_str.erase(std::remove(value_str.begin(), value_str.end(), '}'), value_str.end());
+        value_str.erase(std::remove(value_str.begin(), value_str.end(), ']'), value_str.end());
+
+        // Robust numeric parsing: ensure full consumption
+        const char* cstr = value_str.c_str();
+        char* endptr = nullptr;
+        errno = 0;
+        double value = std::strtod(cstr, &endptr);
+        bool ok = (errno == 0) && (endptr != cstr);
+        // Ensure remaining chars are only whitespace
+        while (ok && *endptr != '\0') {
+            if (!std::isspace(static_cast<unsigned char>(*endptr))) { ok = false; break; }
+            ++endptr;
+        }
+        if (!ok) {
+            // Malformed numeric; abort to prevent corrupt params
+            return false;
+        }
+        params[key] = value;
+    }
+
+    return !material_name.empty();
             }
         }
     }
