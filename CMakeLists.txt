@@ -133,7 +133,13 @@ install(TARGETS pseudomode_framework
 
 # Create command-line executable
 add_executable(pseudomode_cli src/main.cpp)
-target_link_libraries(pseudomode_cli pseudomode_framework)
+
+# CLI needs to link the library and Eigen headers
+if(Eigen3_FOUND)
+    target_link_libraries(pseudomode_cli pseudomode_framework Eigen3::Eigen)
+else()
+    target_link_libraries(pseudomode_cli pseudomode_framework)
+endif()
 
 install(TARGETS pseudomode_cli
     RUNTIME DESTINATION bin
