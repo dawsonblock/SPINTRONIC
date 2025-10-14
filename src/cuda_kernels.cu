@@ -38,24 +38,32 @@ __global__ void sparse_matvec_kernel(
     int cols) {
 
     int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= rows) return;
 
-    if (row < rows) {
-        cuDoubleComplex sum = make_cuDoubleComplex(0.0, 0.0);
+    cuDoubleComplex sum = make_cuDoubleComplex(0.0, 0.0);
 
-        // Bounds checking for row pointers
-        int row_start = row_ptrs[row];
-        int row_end = row_ptrs[row + 1];
-        
-        for (int j = row_start; j < row_end; ++j) {
-            int col = col_indices[j];
-            // SECURITY: Validate column index to prevent out-of-bounds access
-            if (col >= 0 && col < cols) {
-                sum = cuCadd(sum, cuCmul(values[j], x[col]));
-            }
-        }
+    // Validate CSR row pointers and clamp to nnz range
+    int nnz = row_ptrs[rows];
+    int row_start = row_ptrs[row];
+    int row_end = row_ptrs[row + 1];
 
+    // Clamp and sanitize
+    row_start = max(0, min(row_start, nnz));
+    row_end   = max(0, min(row_end, nnz));
+    if (row_end < row_start) {
+        // Malformed CSR; treat as empty row
         y[row] = sum;
+        return;
     }
+
+    for (int j = row_start; j < row_end; ++j) {
+        int col = col_indices[j];
+        if (col >= 0 && col < cols) {
+            sum = cuCadd(sum, cuCmul(values[j], x[col]));
+        }
+    }
+
+    y[row] = sum;
 }
 
 /**
