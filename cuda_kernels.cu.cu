@@ -102,9 +102,11 @@ __global__ void expectation_value_kernel(
     }
 
     // Write result of this block to global memory
+    // Write result of this block to global memory using separate double buffers
     if (threadIdx.x == 0) {
-        atomicAdd(&result->x, shared_data[0].x);
-        atomicAdd(&result->y, shared_data[0].y);
+        // result_real and result_imag are separate double pointers passed in
+        atomicAdd(result_real, shared_data[0].x);
+        atomicAdd(result_imag, shared_data[0].y);
     }
 }
 
