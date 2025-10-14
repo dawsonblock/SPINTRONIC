@@ -98,11 +98,32 @@ Build-ubuntu-cpu:
         if: steps.cuda-check.outputs.cuda_available == 'true'
         run: |
           cmake -B build -DUSE_CUDA=ON -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --parallel $(nproc)
+          - name: Install dependencies
+            if: steps.cuda-check.outputs.cuda_available == 'true'
+            run: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                build-essential cmake ninja-build \
+                libomp-dev libgtest-dev
 
-  # =============================================================================
-  # Job 3: Python Bindings Test
-  # =============================================================================
+          - name: Install Eigen3
+            if: steps.cuda-check.outputs.cuda_available == 'true'
+            run: |
+              wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+              tar xzf eigen-3.4.0.tar.gz
+              cd eigen-3.4.0
+              mkdir build && cd build
+              cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/eigen3_install
+              make install
+
+          - name: Build with CUDA
+            if: steps.cuda-check.outputs.cuda_available == 'true'
+            run: |
+              cmake -B build \
+                -DUSE_CUDA=ON \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
+              cmake --build build --parallel $(nproc)
   test-python-bindings:
     name: Python Bindings Tests
     runs-on: ubuntu-22.04
