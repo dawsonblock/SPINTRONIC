@@ -130,40 +130,42 @@ __global__ void expectation_value_kernel(
     cuDoubleComplex* result_blocks,
     int dim) {
 
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Dynamic shared memory allocation; ensure block size does not exceed limit
-    extern __shared__ cuDoubleComplex shared_data[];
-
-    // Enforce safe block size for all threads in the block
-    if (blockDim.x > MAX_BLOCK_SIZE) {
-        // Abort entire block deterministically
+    // Basic null checks to avoid undefined behavior
+    if (!observable_diag || !state_diag || !result_blocks) {
         return;
     }
 
-    cuDoubleComplex local_sum = make_cuDoubleComplex(0.0, 0.0);
+    // Enforce block size limit for the whole block to avoid sync divergence
+    if (blockDim.x > MAX_BLOCK_SIZE) {
+        return;
+    }
 
-    // Each thread computes partial sum with bounds checking
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Dynamic shared memory sized to at least blockDim.x elements by the host
+    extern __shared__ cuDoubleComplex shared_data[];
+
+    cuDoubleComplex local_sum = make_cuDoubleComplex(0.0, 0.0);
     if (idx < dim) {
         local_sum = cuCmul(observable_diag[idx], state_diag[idx]);
     }
 
+    // All threads participate in synchronization points
     shared_data[threadIdx.x] = local_sum;
     __syncthreads();
 
-    // Parallel reduction in shared memory over active threads
+    // Parallel reduction in shared memory
     for (int s = blockDim.x >> 1; s > 0; s >>= 1) {
         if (threadIdx.x < s) {
-            shared_data[threadIdx.x] = cuCadd(
-                shared_data[threadIdx.x],
-                shared_data[threadIdx.x + s]
-            );
+            shared_data[threadIdx.x] = cuCadd(shared_data[threadIdx.x],
+                                              shared_data[threadIdx.x + s]);
         }
         __syncthreads();
     }
 
-    // Write block sum to global result array
     if (threadIdx.x == 0) {
+        // result_blocks must have at least gridDim.x elements
         result_blocks[blockIdx.x] = shared_data[0];
     }
 }
