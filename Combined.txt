@@ -329,13 +329,33 @@ void LindbladSolver::add_dissipator(
     const ComplexMatrix& L,
     const ComplexVector& state) const {
 
-    // For pure states, dissipator acts as: L|ψ⟩
-    // This is simplified - full implementation would handle density matrices
-    ComplexVector L_psi = matrix_vector_mult(L, state);
+    // For a state vector, the dissipative evolution (without jumps) is governed
+    // by a non-Hermitian term: -0.5 * L†L |ψ⟩
+    ComplexMatrix L_dagger_L = matrix_matrix_mult_dagger_A_B(L, L);
+    ComplexVector L_dagger_L_psi = matrix_vector_mult(L_dagger_L, state);
 
     for (size_t i = 0; i < result.size(); ++i) {
-        result[i] += L_psi[i];
+        result[i] -= 0.5 * L_dagger_L_psi[i];
     }
+}
+
+// Helper function to be added for L†L calculation
+ComplexMatrix LindbladSolver::matrix_matrix_mult_dagger_A_B(
+    const ComplexMatrix& A,
+    const ComplexMatrix& B) const {
+    
+    int dim = A.size();
+    ComplexMatrix result(dim, std::vector<Complex>(dim, {0.0, 0.0}));
+
+    #pragma omp parallel for if(dim > 500)
+    for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) {
+            for (int k = 0; k < dim; ++k) {
+                result[i][j] += std::conj(A[k][i]) * B[k][j];
+            }
+        }
+    }
+    return result;
 }
 
 ComplexVector LindbladSolver::matrix_vector_mult(
