@@ -44,8 +44,31 @@ QuantumState::QuantumState(int system_dim, int n_pseudomodes, int n_max)
     d_state_vector_ = nullptr;
 #endif
 
-    std::cout << "Created quantum state: system_dim=" << sys_dim_
-              << ", n_modes=" << n_modes_ << ", n_max=" << n_max_
+    // safe integer exponentiation
+    auto int_pow = [](int base, int exp) {
+        int result = 1;
+        while (exp > 0) {
+            if (exp & 1) {
+                if (result > std::numeric_limits<int>::max() / base) {
+                    throw std::overflow_error("Index computation overflow in excited_index");
+                }
+                result *= base;
+            }
+            exp >>= 1;
+            if (exp) {
+                if (base > 0 && base > std::numeric_limits<int>::max() / base) {
+                    throw std::overflow_error("Index computation overflow in excited_index");
+                }
+                base *= base;
+            }
+        }
+        return result;
+    };
+    int excited_index = int_pow(n_max_, n_modes_);
+    if (excited_index < 0 || excited_index >= total_dim_) {
+        throw std::out_of_range("excited_index out of bounds");
+    }
+    state_vector_[excited_index] = Complex(1.0, 0.0);
               << ", total_dim=" << total_dim_ << std::endl;
 }
 
