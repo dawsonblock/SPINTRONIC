@@ -1,8 +1,14 @@
 # Test matrix configuration for comprehensive coverage
 test_matrix:
   compilers:
-    - gcc-9, gcc-10, gcc-11, gcc-12
-    - clang-12, clang-13, clang-14, clang-15
+    - gcc-9
+    - gcc-10
+    - gcc-11
+    - gcc-12
+    - clang-12
+    - clang-13
+   - clang-14
+   - clang-15
 
   platforms:
     - Ubuntu 20.04, 22.04
