@@ -1,0 +1,26 @@
+name: 'Install Eigen3'
+description: 'Download, build, and install Eigen3 library'
+inputs:
+  version:
+    description: 'Eigen3 version to install'
+    required: false
+    default: '3.4.0'
+  install-prefix:
+    description: 'Installation prefix path'
+    required: false
+    default: '$HOME/eigen3_install'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Eigen3
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        PREFIX="${{ inputs.install-prefix }}"
+        ARCHIVE="eigen-${VERSION}.tar.gz"
+        wget "https://gitlab.com/libeigen/eigen/-/archive/${VERSION}/${ARCHIVE}"
+        tar xzf "${ARCHIVE}"
+        cd "eigen-${VERSION}"
+        mkdir build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX="${PREFIX}"
+        make install
