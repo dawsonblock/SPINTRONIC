@@ -36,8 +36,8 @@ spec:
           value: "10"
         - name: LOG_LEVEL
           value: "INFO"
-        - name: CUDA_VISIBLE_DEVICES
-          value: "0"
+        # The 'CUDA_VISIBLE_DEVICES' environment variable should be removed.
+        # The NVIDIA device plugin will automatically set 'NVIDIA_VISIBLE_DEVICES'.
         resources:
           requests:
             memory: "8Gi"
