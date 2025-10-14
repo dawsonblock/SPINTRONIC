@@ -19,20 +19,32 @@ Build-ubuntu-cpu:
           # Install compilers per matrix
           if [ "${{ matrix.compiler }}" = "gcc-11" ]; then
             sudo apt-get install -y gcc-11 g++-11
-            export CC=gcc-11
-            export CXX=g++-11
+            echo "CC=gcc-11" >> $GITHUB_ENV
+            echo "CXX=g++-11" >> $GITHUB_ENV
           else
             sudo apt-get install -y clang-14
-            export CC=clang-14
-            export CXX=clang++-14
+            echo "CC=clang-14" >> $GITHUB_ENV
+            echo "CXX=clang++-14" >> $GITHUB_ENV
           fi
           sudo apt-get install -y \
             build-essential cmake ninja-build \
             libomp-dev libgtest-dev \
             python3 python3-dev python3-pip
           pip3 install pybind11 numpy
-          echo "CC=$CC" >> $GITHUB_ENV
-          echo "CXX=$CXX" >> $GITHUB_ENV
+      - name: Configure CMake
+        env:
+          CC: ${{ env.CC }}
+          CXX: ${{ env.CXX }}
+        run: |
+          cmake -B build \
+            -DCMAKE_C_COMPILER="${CC}" \
+            -DCMAKE_CXX_COMPILER="${CXX}" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DUSE_OPENMP=ON \
+            -DUSE_CUDA=OFF \
+            -DBUILD_PYTHON_BINDINGS=ON \
+            -DBUILD_TESTS=ON \
+            -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
       
       - name: Install Eigen3
         run: |
