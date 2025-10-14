@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <chrono>
 
 // CUDA support (optional compilation)
 #ifdef USE_CUDA
@@ -283,7 +284,7 @@ public:
     // Complete workflow: spectrum → pseudomodes → dynamics → coherence
     struct SimulationResult {
         std::vector<PseudomodeParams> fitted_modes;
-        CoherenceTimes coherence_times;
+        LindbladEvolution::CoherenceTimes coherence_times;
         std::vector<std::unique_ptr<QuantumState>> time_evolution;
         double computation_time_seconds;
         std::string status;
