@@ -1,56 +1,22 @@
-# .github/actions/install-eigen3/action.yml
-+name: Install Eigen3
-+description: Install and cache Eigen3 from source
-+inputs:
-+  version:
-+    description: Eigen3 version (e.g., 3.4.0)
-+    required: true
-+    default: "3.4.0"
-    path: ${{ inputs.install-prefix }}
-    key: ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-${{ hashFiles('.github/actions/install-eigen3/action.yml') }}
-    restore-keys: |
-      ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-
-      ${{ runner.os }}-${{ runner.arch }}-eigen-
-+    required: true
-+    default: ${{ runner.temp }}/eigen3_install
- runs:
-   using: 'composite'
-   steps:
-+    - name: Validate inputs
-+      shell: bash
-+      run: |
-+        set -euo pipefail
-+        if [ -z "${{ inputs.version }}" ]; then
-+          echo "Input 'version' is required" >&2
-+          exit 1
-+        fi
-+        if [ -z "${{ inputs.install-prefix }}" ]; then
-+          echo "Input 'install-prefix' is required" >&2
-+          exit 1
-+        fi
-+        mkdir -p "${{ inputs.install-prefix }}"
-     - name: Cache Eigen3 installation
-       id: cache-eigen
-       uses: actions/cache@v3
-       with:
-         path: ${{ inputs.install-prefix }}
-         key: ${{ runner.os }}-eigen-${{ inputs.version }}
--
-     - name: Install Eigen3 if not cached
-       if: steps.cache-eigen.outputs.cache-hit != 'true'
-       shell: bash
-       run: |
--        # ... same build script as before ...
-+        set -euo pipefail
-         VERSION="${{ inputs.version }}"
-         PREFIX="${{ inputs.install-prefix }}"
--        wget ...
--        make install
-+        # fetch and install Eigen
-+        wget "https://gitlab.com/libeigen/eigen/-/archive/${VERSION}/eigen-${VERSION}.tar.gz"
-+        tar xzf "eigen-${VERSION}.tar.gz"
-+        cd "eigen-${VERSION}"
-+        cmake -S . -B build -DCMAKE_INSTALL_PREFIX="${PREFIX}"
-+        cmake --build build --target install --parallel
-
-      
+       - name: Install Eigen3
++  id: eigen
+   uses: ./.github/actions/install-eigen3
++  with:
++    install-prefix: ${{ runner.temp }}/eigen3_install
+ 
+ - name: Configure CMake
+   env:
+     CC: ${{ env.CC }}
+     CXX: ${{ env.CXX }}
++    EIGEN_PREFIX: ${{ runner.temp }}/eigen3_install
+   run: |
+     cmake -B build \
+       -DCMAKE_C_COMPILER="${CC}" \
+       -DCMAKE_CXX_COMPILER="${CXX}" \
+       -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+       -DUSE_OPENMP=ON \
+       -DUSE_CUDA=OFF \
+       -DBUILD_PYTHON_BINDINGS=ON \
+       -DBUILD_TESTS=ON \
+-      -DEigen3_DIR=$HOME/eigen3_install/share/eigen3/cmake
++      -DEigen3_DIR="${EIGEN_PREFIX}/share/eigen3/cmake"
