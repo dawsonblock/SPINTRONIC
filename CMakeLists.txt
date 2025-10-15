@@ -8,6 +8,11 @@ project(pseudomode_framework_cuda VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Add local Eigen path if it exists
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen-3.4.0")
+    set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen-3.4.0" ${CMAKE_PREFIX_PATH})
+endif()
+
 # Find required packages
 find_package(Eigen3 QUIET)
 find_package(OpenMP QUIET)
@@ -56,13 +61,21 @@ endif()
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/eigen-3.4.0
 )
 
 if(Eigen3_FOUND)
     include_directories(${EIGEN3_INCLUDE_DIR})
     message(STATUS "Eigen3 found: ${EIGEN3_INCLUDE_DIR}")
 else()
-    message(WARNING "Eigen3 not found - some features will be disabled")
+    # Use bundled Eigen
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/eigen-3.4.0")
+        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/eigen-3.4.0)
+        message(STATUS "Using bundled Eigen from external/eigen-3.4.0")
+        set(Eigen3_FOUND TRUE)
+    else()
+        message(WARNING "Eigen3 not found - some features will be disabled")
+    endif()
 endif()
 
 # Source files
@@ -100,7 +113,8 @@ if(CUDA_ENABLED)
 endif()
 
 # Link Eigen (header-only) if found
-if(Eigen3_FOUND)
+# Eigen is header-only, so we don't need to link anything when using bundled version
+if(TARGET Eigen3::Eigen)
     target_link_libraries(pseudomode_framework PRIVATE Eigen3::Eigen)
 endif()
 
@@ -136,12 +150,12 @@ install(TARGETS pseudomode_framework
 add_executable(pseudomode_cli src/main.cpp)
 
 # CLI needs to link the library and Eigen headers
-# CLI needs to link the library and Eigen headers
+if(TARGET Eigen3::Eigen)
     target_link_libraries(pseudomode_cli pseudomode_framework Eigen3::Eigen)
     target_compile_definitions(pseudomode_cli PRIVATE PSEUDOMODE_HAVE_EIGEN=1)
 else()
     target_link_libraries(pseudomode_cli pseudomode_framework)
-    target_compile_definitions(pseudomode_cli PRIVATE PSEUDOMODE_HAVE_EIGEN=0)
+    target_compile_definitions(pseudomode_cli PRIVATE PSEUDOMODE_HAVE_EIGEN=1)
 endif()
 
 install(TARGETS pseudomode_cli

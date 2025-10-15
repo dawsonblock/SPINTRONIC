@@ -78,7 +78,13 @@ PYBIND11_MODULE(pseudomode_py, m) {
         .def_static("build_material_spectrum_T", &SpectralDensity2D::build_material_spectrum_T,
                    "Build temperature-dependent material spectral density",
                    py::arg("omega"), py::arg("material"), py::arg("temperature_K"))
-        .def_static("load_material_from_json", &SpectralDensity2D::load_material_from_json,
+        .def_static("load_material_from_json", 
+                   [](const std::string& json_filename, 
+                      std::string& material_name,
+                      std::unordered_map<std::string, double>& params) {
+                       return SpectralDensity2D::load_material_from_json(
+                           json_filename, material_name, params, nullptr);
+                   },
                    "Load custom material from JSON file",
                    py::arg("json_filename"), py::arg("material_name"), py::arg("params"))
         .def_static("build_custom_material_spectrum", &SpectralDensity2D::build_custom_material_spectrum,

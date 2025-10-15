@@ -545,10 +545,14 @@ std::vector<double> SpectralDensity2D::build_material_spectrum_T(
 bool SpectralDensity2D::load_material_from_json(
     const std::string& json_filename,
     std::string& material_name,
-    std::unordered_map<std::string, double>& params) {
+    std::unordered_map<std::string, double>& params,
+    std::string* error_message) {
 
     std::ifstream file(json_filename);
     if (!file.is_open()) {
+        if (error_message) {
+            *error_message = "Failed to open file: " + json_filename;
+        }
         return false;
     }
 
@@ -600,11 +604,6 @@ bool SpectralDensity2D::load_material_from_json(
         bool ok = (errno == 0) && (endptr != cstr);
         // Ensure remaining chars are only whitespace
         while (ok && *endptr != '\0') {
-            if (!std::isspace(static_cast<unsigned char>(*endptr))) { ok = false; break; }
-        return !material_name.empty();
-        params[key] = value;
-    }
-        while (ok && *endptr != '\0') {
             if (!std::isspace(static_cast<unsigned char>(*endptr))) {
                 ok = false;
                 break;
@@ -615,6 +614,17 @@ bool SpectralDensity2D::load_material_from_json(
         if (ok) {
             params[key] = value;
         }
+    }
+    
+    file.close();
+    return !material_name.empty();
+}
+
+std::vector<double> SpectralDensity2D::build_custom_material_spectrum(
+    const std::vector<double>& omega,
+    const std::unordered_map<std::string, double>& params) {
+    
+    std::vector<double> J_total(omega.size(), 0.0);
     
     // Extract acoustic parameters
     double alpha_ac = params.count("alpha_ac") ? params.at("alpha_ac") : 0.01;
