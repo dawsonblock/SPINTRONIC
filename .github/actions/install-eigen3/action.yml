@@ -6,8 +6,11 @@
 +    description: Eigen3 version (e.g., 3.4.0)
 +    required: true
 +    default: "3.4.0"
-+  install-prefix:
-+    description: Absolute path to installation prefix
+    path: ${{ inputs.install-prefix }}
+    key: ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-${{ hashFiles('.github/actions/install-eigen3/action.yml') }}
+    restore-keys: |
+      ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-
+      ${{ runner.os }}-${{ runner.arch }}-eigen-
 +    required: true
 +    default: ${{ runner.temp }}/eigen3_install
  runs:
