@@ -1,0 +1,69 @@
+name: Install Eigen3
+description: Install and cache Eigen3 from source
+inputs:
+  version:
+    description: Eigen3 version (e.g., 3.4.0)
+    required: true
+    default: "3.4.0"
+  install-prefix:
+    description: Installation prefix for Eigen3
+    required: true
+    default: ${{ runner.temp }}/eigen3_install
+  sha256:
+    description: Optional SHA256 of the tarball for integrity checking
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        [[ -n "${{ inputs.version }}" ]]
+        [[ -n "${{ inputs.install-prefix }}" ]]
+        mkdir -p "${{ inputs.install-prefix }}"
+
+    - name: Cache Eigen3 installation
+      id: cache-eigen
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.install-prefix }}
+        key: ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-${{ hashFiles('.github/actions/install-eigen3/action.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-eigen-${{ inputs.version }}-
+          ${{ runner.os }}-${{ runner.arch }}-eigen-
+
+    - name: Install Eigen3 if not cached
+      if: steps.cache-eigen.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
+        PREFIX="${{ inputs.install-prefix }}"
+        URL="https://gitlab.com/libeigen/eigen/-/archive/${VERSION}/eigen-${VERSION}.tar.gz"
+
+        curl -fsSL "$URL" -o eigen.tar.gz
+        if [[ -n "${{ inputs.sha256 }}" ]]; then
+          echo "${{ inputs.sha256 }}  eigen.tar.gz" | shasum -a 256 -c -
+        fi
+
+        mkdir src && tar xzf eigen.tar.gz -C src --strip-components=1
+        cmake -S src -B build \
+          -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTING=OFF
+        cmake --build build --target install --parallel
+
+    - name: Expose outputs
+      id: expose
+      shell: bash
+      run: |
+        set -euo pipefail
+        inc="$({ set -e; echo "${{ inputs.install-prefix }}"/include/eigen3; })"
+        echo "include_dir=$inc" >> "$GITHUB_OUTPUT"
+        echo "${{ inputs.install-prefix }}/bin" >> "$GITHUB_PATH"
+
+outputs:
+  include-dir:
+    description: Eigen3 include directory for downstream CMake
+    value: ${{ steps.expose.outputs.include_dir }}
