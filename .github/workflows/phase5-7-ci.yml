@@ -51,10 +51,27 @@ jobs:
           pip3 install pybind11 numpy
 
       - name: Install Eigen3
+        env:
+          EIGEN_PREFIX: ${{ env.HOME }}/eigen3_install
         uses: ./.github/actions/install-eigen3
         with:
           version: '3.4.0'
-          install-prefix: $HOME/eigen3_install
+          install-prefix: ${{ env.EIGEN_PREFIX }}
+      - name: Configure CMake
+        env:
+          CC: ${{ env.CC }}
+          CXX: ${{ env.CXX }}
+          EIGEN_PREFIX: ${{ env.HOME }}/eigen3_install
+        run: |
+          cmake -B build \
+            -DCMAKE_C_COMPILER="${CC}" \
+            -DCMAKE_CXX_COMPILER="${CXX}" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DUSE_OPENMP=ON \
+            -DUSE_CUDA=OFF \
+            -DBUILD_PYTHON_BINDINGS=ON \
+            -DBUILD_TESTS=ON \
+            -DEigen3_DIR="${EIGEN_PREFIX}/share/eigen3/cmake"
 
       - name: Configure CMake
         env:
