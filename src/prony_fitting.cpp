@@ -101,14 +101,16 @@ PronyFitter::FitResult PronyFitter::fit_correlation(
             continue;
         }
 
-        // Constrained refinement
+        // Constrained refinement (with fallback to initial fit if refinement fails)
         auto refined_result = refine_parameters(
             prony_result.modes, C_data, t_grid, temperature_K
         );
 
         if (!refined_result.converged) {
             std::cout << "  Refinement failed: " << refined_result.message << std::endl;
-            continue;
+            std::cout << "  Using initial Prony fit instead" << std::endl;
+            // Use the initial Prony fit instead of skipping
+            refined_result = prony_result;
         }
 
         // Compute BIC
@@ -187,19 +189,24 @@ PronyFitter::FitResult PronyFitter::fit_prony_initial(
         auto roots = find_polynomial_roots(poly_coeffs);
 
         // Extract physical parameters
-        const double dt = t_grid[1] - t_grid[0];
+        const double dt = t_grid[1] - t_grid[0];  // in picoseconds
+        // Convert from ps⁻¹ to eV: multiply by ℏ and divide by ps conversion
+        // ℏ = 6.582e-16 eV·s, 1 ps = 1e-12 s
+        // freq[eV] = freq[ps⁻¹] × ℏ / (1e-12)
+        const double ps_inv_to_eV = 6.582119569e-16 / 1.0e-12;  // ~6.582e-4 eV per ps⁻¹
+        
         std::vector<PseudomodeParams> modes;
 
         for (const auto& root : roots) {
             if (std::abs(root) > 1e-12) {
                 Complex log_root = std::log(root);
-                double gamma_k = -std::real(log_root) / dt;
-                double omega_k = -std::imag(log_root) / dt;
+                double gamma_k_ps_inv = -std::real(log_root) / dt;  // in ps⁻¹
+                double omega_k_ps_inv = -std::imag(log_root) / dt;  // in ps⁻¹
 
-                if (gamma_k > 0.0) { // Stable mode
+                if (gamma_k_ps_inv > 0.0) { // Stable mode
                     PseudomodeParams mode;
-                    mode.gamma_eV = gamma_k;
-                    mode.omega_eV = omega_k;
+                    mode.gamma_eV = gamma_k_ps_inv * ps_inv_to_eV;  // Convert to eV
+                    mode.omega_eV = omega_k_ps_inv * ps_inv_to_eV;  // Convert to eV
                     mode.mode_type = "prony_fitted";
                     modes.push_back(mode);
                 }
@@ -212,11 +219,15 @@ PronyFitter::FitResult PronyFitter::fit_prony_initial(
         }
 
         // Solve for coupling strengths |g_k|² = η_k
+        // Convert time to natural units (eV⁻¹)
+        const double ps_to_eV_inv = 1.0e-12 / 6.582119569e-16;
+        
         Eigen::MatrixXcd A(M, modes.size());
         for (int i = 0; i < M; ++i) {
+            const double t_natural = t_grid[i] * ps_to_eV_inv;
             for (size_t k = 0; k < modes.size(); ++k) {
                 Complex exponent = -(modes[k].gamma_eV + 
-                                   Complex(0.0, modes[k].omega_eV)) * t_grid[i];
+                                   Complex(0.0, modes[k].omega_eV)) * t_natural;
                 A(i, k) = std::exp(exponent);
             }
         }
@@ -326,8 +337,8 @@ PronyFitter::FitResult PronyFitter::refine_parameters(
 
     // Levenberg-Marquardt parameters
     double lambda = 0.01;
-    const int max_iterations = 100;
-    const double tolerance = 1e-8;
+    const int max_iterations = 200;
+    const double tolerance = 1e-6;  // Relaxed from 1e-8 for better convergence
 
     for (int iter = 0; iter < max_iterations; ++iter) {
         // Compute residuals and Jacobian
@@ -460,6 +471,10 @@ PronyFitter::compute_residuals_and_jacobian(
     const int K = theta.size() / 3;
     const int M = C_data.size();
 
+    // Unit conversion: t_grid is in ps, omega/gamma are in eV
+    // t[eV⁻¹] = t[ps] × (1e-12 s/ps) / (ℏ in eV·s) = t[ps] × 1519.3
+    const double ps_to_eV_inv = 1.0e-12 / 6.582119569e-16;
+
     // Pre-allocate return structures
     Eigen::VectorXd residuals(2 * M);
     Eigen::MatrixXd jacobian = Eigen::MatrixXd::Zero(2 * M, 3 * K);
@@ -474,7 +489,7 @@ PronyFitter::compute_residuals_and_jacobian(
 
     // Combined residual and Jacobian computation (single pass)
     for (int i = 0; i < M; ++i) {
-        const double t = t_grid[i];
+        const double t = t_grid[i] * ps_to_eV_inv;  // Convert to natural units (eV⁻¹)
         Complex C_model(0.0, 0.0);
         
         for (int k = 0; k < K; ++k) {

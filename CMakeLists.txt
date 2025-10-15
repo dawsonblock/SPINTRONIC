@@ -23,7 +23,13 @@ check_language(CUDA)
 
 # Optional packages
 find_package(PkgConfig)
-pkg_check_modules(HDF5 hdf5)
+if(PkgConfig_FOUND)
+    pkg_check_modules(HDF5 hdf5)
+    if(NOT HDF5_FOUND)
+        # Try to find HDF5 using CMake's FindHDF5
+        find_package(HDF5 COMPONENTS C)
+    endif()
+endif()
 
 # Build options
 option(USE_CUDA "Enable CUDA GPU acceleration" ON)
@@ -128,9 +134,21 @@ endif()
 
 # Link optional HDF5
 if(HDF5_FOUND)
-    target_include_directories(pseudomode_framework PRIVATE ${HDF5_INCLUDE_DIRS})
-    target_link_libraries(pseudomode_framework PRIVATE ${HDF5_LIBRARIES})
+    if(HDF5_INCLUDE_DIRS)
+        target_include_directories(pseudomode_framework PRIVATE ${HDF5_INCLUDE_DIRS})
+    endif()
+    if(HDF5_LIBRARIES)
+        target_link_libraries(pseudomode_framework PRIVATE ${HDF5_LIBRARIES})
+    elseif(HDF5_C_LIBRARIES)
+        target_link_libraries(pseudomode_framework PRIVATE ${HDF5_C_LIBRARIES})
+    endif()
+    if(HDF5_LIBRARY_DIRS)
+        target_link_directories(pseudomode_framework PRIVATE ${HDF5_LIBRARY_DIRS})
+    endif()
     add_definitions(-DUSE_HDF5)
+    message(STATUS "HDF5 enabled")
+else()
+    message(STATUS "HDF5 not found - HDF5 features disabled")
 endif()
 
 # Set library properties
