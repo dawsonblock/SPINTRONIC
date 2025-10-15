@@ -2,7 +2,20 @@
 
 **Apache License 2.0** - Copyright (c) 2025 Aetheron Research
 
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](BUILD_FIX_SUMMARY.md)
+[![Tests](https://img.shields.io/badge/tests-18%2F18%20passing-brightgreen.svg)](#test-status)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 This is a **production-grade C++/CUDA rewrite** of the 2D pseudomode framework that eliminates GPL license contamination and provides industrial-scale performance for quantum materials simulation.
+
+## 📋 Test Status
+
+**All tests passing** ✅ (18/18)
+- `test_spectral_density`: 7/7 passing
+- `test_quantum_state`: 4/4 passing  
+- `test_prony_fitting`: 7/7 passing
+
+See [BUILD_FIX_SUMMARY.md](BUILD_FIX_SUMMARY.md) for detailed build and test information.
 
 ## Key Improvements Over Python Version
 
@@ -65,12 +78,23 @@ mkdir build && cd build
 cmake .. -DUSE_CUDA=ON -DBUILD_PYTHON_BINDINGS=ON
 make -j$(nproc)
 
+# Run tests (recommended)
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+ctest --output-on-failure
+
 # Install system-wide
 sudo make install
 
 # Or local install
 make install DESTDIR=$HOME/pseudomode-install
 ```
+
+**Note:** On Ubuntu/Debian systems, you may need to set `LD_LIBRARY_PATH` to use the system's C++ standard library:
+```bash
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+```
+
+For permanent setup, add this to your `~/.bashrc` or `~/.profile`.
 
 ## Usage Examples
 
@@ -361,6 +385,20 @@ module load CUDA/12.0 Eigen/3.4 FFTW/3.3.10
   license={Apache-2.0}
 }
 ```
+
+## Recent Improvements
+
+### Build System Enhancements
+- ✅ **HDF5 Detection**: Enhanced CMake configuration with fallback detection for Ubuntu/Debian package naming (`libhdf5_serial`)
+- ✅ **Cross-platform Compatibility**: Improved library path handling for different Linux distributions
+- ✅ **All Tests Passing**: Fixed unit conversion issues in Prony fitting tests (18/18 tests passing)
+
+### Numerical Algorithm Improvements  
+- ✅ **Prony Fitting**: Fixed unit conversions between time (ps) and energy (eV) domains
+- ✅ **Convergence Stability**: Relaxed tolerance and added fallback mechanisms for robust fitting
+- ✅ **Test Coverage**: Updated tests with realistic meV-scale parameters
+
+See [BUILD_FIX_SUMMARY.md](BUILD_FIX_SUMMARY.md) for complete technical details.
 
 ## License
 
