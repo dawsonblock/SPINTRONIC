@@ -1,22 +1,53 @@
 # .github/actions/install-eigen3/action.yml
-runs:
-  using: 'composite'
-  steps:
-    - name: Cache Eigen3 installation
-      id: cache-eigen
-      uses: actions/cache@v3
-      with:
-        path: ${{ inputs.install-prefix }}
-        key: ${{ runner.os }}-eigen-${{ inputs.version }}
-
-    - name: Install Eigen3 if not cached
-      if: steps.cache-eigen.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        
-        VERSION="${{ inputs.version }}"
-        PREFIX="${{ inputs.install-prefix }}"
-        wget ...
-        make install
++name: Install Eigen3
++description: Install and cache Eigen3 from source
++inputs:
++  version:
++    description: Eigen3 version (e.g., 3.4.0)
++    required: true
++    default: "3.4.0"
++  install-prefix:
++    description: Absolute path to installation prefix
++    required: true
++    default: ${{ runner.temp }}/eigen3_install
+ runs:
+   using: 'composite'
+   steps:
++    - name: Validate inputs
++      shell: bash
++      run: |
++        set -euo pipefail
++        if [ -z "${{ inputs.version }}" ]; then
++          echo "Input 'version' is required" >&2
++          exit 1
++        fi
++        if [ -z "${{ inputs.install-prefix }}" ]; then
++          echo "Input 'install-prefix' is required" >&2
++          exit 1
++        fi
++        mkdir -p "${{ inputs.install-prefix }}"
+     - name: Cache Eigen3 installation
+       id: cache-eigen
+       uses: actions/cache@v3
+       with:
+         path: ${{ inputs.install-prefix }}
+         key: ${{ runner.os }}-eigen-${{ inputs.version }}
+-
+     - name: Install Eigen3 if not cached
+       if: steps.cache-eigen.outputs.cache-hit != 'true'
+       shell: bash
+       run: |
+-        # ... same build script as before ...
++        set -euo pipefail
+         VERSION="${{ inputs.version }}"
+         PREFIX="${{ inputs.install-prefix }}"
+-        wget ...
+-        make install
++        # fetch and install Eigen
++        wget "https://gitlab.com/libeigen/eigen/-/archive/${VERSION}/eigen-${VERSION}.tar.gz"
++        tar xzf "eigen-${VERSION}.tar.gz"
++        cd "eigen-${VERSION}"
++        cmake -S . -B build -DCMAKE_INSTALL_PREFIX="${PREFIX}"
++        cmake --build build --target install --parallel
 
       
