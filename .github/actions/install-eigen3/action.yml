@@ -8,7 +8,7 @@ inputs:
   install-prefix:
     description: 'Installation prefix path'
     required: false
-    default: '$HOME/eigen3_install'
+    default: '${{ runner.home }}/eigen3_install'
 runs:
   using: 'composite'
   steps:
